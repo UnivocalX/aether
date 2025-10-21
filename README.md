@@ -1,2 +1,2 @@
-# aether
+# Aether
 Aether Data Platform.
