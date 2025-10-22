@@ -5,22 +5,20 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"runtime"
 	"strings"
 	"time"
 
 	"github.com/fatih/color"
 )
 
+// Options defines configuration for the logger initialization.
 type Options struct {
 	AddSource  bool
 	Production bool
 	Level      string
 }
 
-var log *slog.Logger
-
-// Custom handler for development with colors
+// colorfulHandler implements slog.Handler for development with colors.
 type colorfulHandler struct {
 	handler slog.Handler
 	level   slog.Level
@@ -31,7 +29,6 @@ func (h *colorfulHandler) Enabled(ctx context.Context, level slog.Level) bool {
 }
 
 func (h *colorfulHandler) Handle(ctx context.Context, r slog.Record) error {
-	// Define colors for different log levels
 	var msgColor *color.Color
 	switch r.Level {
 	case slog.LevelDebug:
@@ -46,10 +43,10 @@ func (h *colorfulHandler) Handle(ctx context.Context, r slog.Record) error {
 		msgColor = color.New(color.FgWhite)
 	}
 
-	// Print the message with appropriate color
+	// Print the log message
 	msgColor.Println(r.Message)
 
-	// Print attributes on new lines with indentation
+	// Print structured attributes if any
 	if r.NumAttrs() > 0 {
 		r.Attrs(func(attr slog.Attr) bool {
 			key := color.HiCyanString("  " + attr.Key + ":")
@@ -57,7 +54,6 @@ func (h *colorfulHandler) Handle(ctx context.Context, r slog.Record) error {
 			fmt.Printf("%s %v\n", key, value)
 			return true
 		})
-		// Add extra line break when contextual arguments are provided
 		fmt.Println()
 	}
 
@@ -65,7 +61,6 @@ func (h *colorfulHandler) Handle(ctx context.Context, r slog.Record) error {
 }
 
 func formatValue(value slog.Value) interface{} {
-	// All values use the same white color
 	switch value.Kind() {
 	case slog.KindString:
 		return color.WhiteString("%q", value.String())
@@ -109,6 +104,7 @@ func parseLevel(level string) slog.Level {
 	}
 }
 
+// Init sets up and installs the logger as the global default slog logger.
 func Init(cfg Options) {
 	level := parseLevel(cfg.Level)
 
@@ -126,7 +122,6 @@ func Init(cfg Options) {
 			},
 		})
 	} else {
-		// Use our custom colorful handler for development
 		baseHandler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 			Level:     level,
 			AddSource: cfg.AddSource,
@@ -137,50 +132,14 @@ func Init(cfg Options) {
 		}
 	}
 
-	log = slog.New(handler)
-	slog.SetDefault(log)
+	slog.SetDefault(slog.New(handler))
 }
 
+// InitDefault initializes a development-friendly default logger.
 func InitDefault() {
 	Init(Options{
 		AddSource:  false,
 		Production: false,
 		Level:      "info",
 	})
-}
-
-// Convenience logging functions using structured attributes
-func Info(msg string, args ...any)  { log.Info(msg, args...) }
-func Error(msg string, args ...any) { log.Error(msg, args...) }
-func Debug(msg string, args ...any) { log.Debug(msg, args...) }
-func Warn(msg string, args ...any)  { log.Warn(msg, args...) }
-
-// Contextual logging
-func With(args ...any) *slog.Logger {
-	return log.With(args...)
-}
-
-func ErrorErr(err error, msg string, args ...any) {
-	args = append(args, slog.String("error", err.Error()))
-	log.Error(msg, args...)
-}
-
-func DebugWithCaller(msg string, args ...any) {
-	if pc, file, line, ok := runtime.Caller(1); ok {
-		fn := runtime.FuncForPC(pc)
-		args = append(args,
-			slog.String("caller_func", fn.Name()),
-			slog.String("caller_file", file),
-			slog.Int("caller_line", line),
-		)
-	}
-	log.Debug(msg, args...)
-}
-
-func Get() *slog.Logger {
-	return log
-}
-
-func Sync() error {
-	return nil
 }

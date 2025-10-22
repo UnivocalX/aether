@@ -9,6 +9,7 @@ import (
 	"github.com/UnivocalX/aether/internal/logger"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"log/slog"
 )
 
 // Options holds all application configuration with embedded logger options
@@ -85,7 +86,7 @@ func Init(cmd *cobra.Command) error {
 	logger.Init(opts.Logging)
 
 	// 8. Log the configuration initialization
-	logger.Debug("Configuration initialized.",
+	slog.Debug("Configuration initialized.",
 		"Config Path", opts.ConfigPath,
 		"Production", opts.Logging.Production,
 		"Log Level", opts.Logging.Level,

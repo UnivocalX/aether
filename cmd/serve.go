@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"github.com/UnivocalX/aether/internal/logger"
+	"log/slog"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -13,7 +13,7 @@ var serveCmd = &cobra.Command{
 	Short: "Starts the aether api server",
 	RunE: func(cmd *cobra.Command, args []string) error {
 			port := viper.GetInt("port")
-			logger.Info("Starting aether server.", "Port", port,)
+			slog.Info("Starting aether server.", "Port", port,)
 		return nil
 	},
 }
