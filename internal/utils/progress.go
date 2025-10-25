@@ -1,5 +1,4 @@
-
-package registry
+package utils
 
 import (
 	"fmt"

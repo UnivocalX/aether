@@ -2,24 +2,15 @@ package settings
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"strings"
 
-	"github.com/UnivocalX/aether/internal/logger"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"log/slog"
 )
 
-// Options holds all application configuration with embedded logger options
-type Options struct {
-	Logging    logger.Options
-	ConfigPath string
-}
-
-// Init initializes the configuration system and returns the config
-func Init(cmd *cobra.Command) error {
+// Setup initializes the configuration system and returns the config
+func Setup(cmd *cobra.Command) error {
 	// 1. Set up Viper to use environment variables.
 	viper.SetEnvPrefix("AETHER")
 
@@ -64,50 +55,6 @@ func Init(cmd *cobra.Command) error {
 	err := viper.BindPFlags(cmd.Flags())
 	if err != nil {
 		return err
-	}
-
-	// 5. Validate log level before initializing logger
-	logLevel := viper.GetString("level")
-	if err := validateLogLevel(logLevel); err != nil {
-		logLevel = "info" // Fallback to default
-	}
-
-	// 6. Create config options with embedded logger options
-	opts := &Options{
-		Logging: logger.Options{
-			AddSource:  true, // You can make this configurable too
-			Production: viper.GetBool("production"),
-			Level:      logLevel,
-		},
-		ConfigPath: viper.ConfigFileUsed(),
-	}
-
-	// 7. Initialize logger once with the config
-	logger.Init(opts.Logging)
-
-	// 8. Log the configuration initialization
-	slog.Debug("Configuration initialized.",
-		"Config Path", opts.ConfigPath,
-		"Production", opts.Logging.Production,
-		"Log Level", opts.Logging.Level,
-	)
-
-	return nil
-}
-
-// validateLogLevel validates that the log level is one of the allowed values
-func validateLogLevel(level string) error {
-	allowedLevels := map[string]bool{
-		"debug":   true,
-		"info":    true,
-		"warn":    true,
-		"warning": true,
-		"error":   true,
-	}
-
-	levelLower := strings.ToLower(level)
-	if !allowedLevels[levelLower] {
-		return fmt.Errorf("invalid log level %q, must be one of: debug, info, warn, error", level)
 	}
 
 	return nil

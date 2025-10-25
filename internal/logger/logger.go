@@ -18,6 +18,23 @@ type Options struct {
 	Level      string
 }
 
+func (opt *Options) GetLevelValue() (slog.Level, error) {
+	level := strings.ToLower(opt.Level)
+
+	switch level {
+	case "info":
+		return slog.LevelInfo, nil
+	case "debug":
+		return slog.LevelDebug, nil
+	case "warn", "warning":
+		return slog.LevelWarn, nil
+	case "error":
+		return slog.LevelError, nil
+	default:
+		return 0, fmt.Errorf("invalid log level %q, must be one of: debug, info, warn, error", level)
+	}
+}
+
 // colorfulHandler implements slog.Handler for development with colors.
 type colorfulHandler struct {
 	handler slog.Handler
@@ -91,25 +108,16 @@ func (h *colorfulHandler) WithGroup(name string) slog.Handler {
 	}
 }
 
-func parseLevel(level string) slog.Level {
-	switch strings.ToLower(level) {
-	case "debug":
-		return slog.LevelDebug
-	case "warn", "warning":
-		return slog.LevelWarn
-	case "error":
-		return slog.LevelError
-	default:
-		return slog.LevelInfo
-	}
-}
+// Setup sets up and installs the logger as the global default slog logger.
+func Setup(opt *Options) error {
+	level, err := opt.GetLevelValue()
 
-// Init sets up and installs the logger as the global default slog logger.
-func Init(cfg Options) {
-	level := parseLevel(cfg.Level)
+	if err != nil {
+		return err
+	}
 
 	var handler slog.Handler
-	if cfg.Production {
+	if opt.Production {
 		handler = slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 			Level: level,
 			ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
@@ -124,7 +132,7 @@ func Init(cfg Options) {
 	} else {
 		baseHandler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 			Level:     level,
-			AddSource: cfg.AddSource,
+			AddSource: opt.AddSource,
 		})
 		handler = &colorfulHandler{
 			handler: baseHandler,
@@ -133,11 +141,12 @@ func Init(cfg Options) {
 	}
 
 	slog.SetDefault(slog.New(handler))
+	return nil
 }
 
-// InitDefault initializes a development-friendly default logger.
-func InitDefault() {
-	Init(Options{
+// SetupDefault initializes a development-friendly default logger.
+func SetupDefault() { 
+	Setup(&Options{
 		AddSource:  false,
 		Production: false,
 		Level:      "info",
