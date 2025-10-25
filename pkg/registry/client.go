@@ -5,77 +5,128 @@ import (
 	"fmt"
 	"log/slog"
 	"path"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
 type Client struct {
-	CFG Config
+	Opt *Options
 	S3  *s3.Client
+	Pre *s3.PresignClient
 }
 
-// New creates a new registry client with validated configuration
-func New(cfg Config) (*Client, error) {
-	slog.Info("Creating a new registry instance")
+// New creates a new registry client
+func New(opt *Options) (*Client, error) {
+	slog.Debug("Creating registry client")
 
-	// Validate configuration first
-	if err := cfg.Validate(); err != nil {
-		return nil, fmt.Errorf("failed to create registry client: %w", err)
+	if err := opt.Normalize(); err != nil {
+		return nil, fmt.Errorf("invalid config: %w", err)
 	}
 
-	// Load AWS config with custom endpoint if provided
 	awsCfg, err := config.LoadDefaultConfig(context.TODO(),
-		config.WithRegion("us-east-1"), // Default region, can be made configurable
+		config.WithRegion("us-east-1"),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load AWS config: %w", err)
+		return nil, fmt.Errorf("aws config: %w", err)
 	}
 
-	// Create S3 client with custom endpoint if provided
-	s3Options := []func(*s3.Options){}
-	if cfg.S3Endpoint != "" {
-		s3Options = append(s3Options, func(o *s3.Options) {
-			o.BaseEndpoint = aws.String(cfg.S3Endpoint)
-			o.UsePathStyle = true // Often needed for custom endpoints
+	s3Opts := []func(*s3.Options){}
+	if opt.S3Endpoint != "" {
+		s3Opts = append(s3Opts, func(o *s3.Options) {
+			o.BaseEndpoint = aws.String(opt.S3Endpoint)
+			o.UsePathStyle = true
 		})
 	}
 
-	s3Client := s3.NewFromConfig(awsCfg, s3Options...)
+	s3Client := s3.NewFromConfig(awsCfg, s3Opts...)
+	preClient := s3.NewPresignClient(s3Client)
 
 	client := &Client{
-		CFG: cfg,
+		Opt: opt,
 		S3:  s3Client,
+		Pre: preClient,
 	}
 
-	// Optional: Test the connection
-	if err := client.testConnection(context.TODO()); err != nil {
-		return nil, fmt.Errorf("failed to test registry connection: %w", err)
+	// Use background context for connection test during initialization
+	if err := client.Ping(context.Background()); err != nil {
+		return nil, fmt.Errorf("connection failed: %w", err)
 	}
 
-	slog.Info("Registry client created successfully",
-		"endpoint", cfg.S3Endpoint,
-		"bucket", cfg.Bucket,
-		"prefix", cfg.Prefix)
+	slog.Debug("Registry client ready",
+		"endpoint", opt.S3Endpoint,
+		"bucket", opt.Bucket,
+		"prefix", opt.Prefix)
 
 	return client, nil
 }
 
-// testConnection verifies that the client can communicate with S3
-func (client *Client) testConnection(ctx context.Context) error {
-	_, err := client.S3.HeadBucket(ctx, &s3.HeadBucketInput{
-		Bucket: aws.String(client.CFG.Bucket),
+// Ping verifies S3 connection
+func (c *Client) Ping(ctx context.Context) error {
+	_, err := c.S3.HeadBucket(ctx, &s3.HeadBucketInput{
+		Bucket: aws.String(c.Opt.Bucket),
 	})
 	if err != nil {
-		return fmt.Errorf("cannot access bucket %s: %w", client.CFG.Bucket, err)
+		return fmt.Errorf("bucket access: %w", err)
 	}
 	return nil
 }
 
-// constructS3Key generates the S3 key path for a file
-func (client *Client) constructS3Key(filePath, sha256 string) string {
-	ext := path.Ext(filePath)
-	fileName := fmt.Sprintf("%s%s", sha256, ext)
-	return path.Join(client.CFG.Prefix, fileName)
+// Key generates the S3 key path
+func (c *Client) Key(sha256 string) string {
+	return path.Join(c.Opt.Prefix, sha256)
+}
+
+// PutURL generates a presigned URL for upload (default expiry)
+func (c *Client) PutURL(ctx context.Context, sha256 string) (string, error) {
+	return c.PutURLExpire(ctx, sha256, c.Opt.TTL)
+}
+
+// PutURLExpire generates a presigned URL with custom expiry and checksum validation
+func (c *Client) PutURLExpire(ctx context.Context, sha256 string, expire time.Duration) (string, error) {
+	input := &s3.PutObjectInput{
+		Bucket:            aws.String(c.Opt.Bucket),
+		Key:               aws.String(c.Key(sha256)),
+		ChecksumAlgorithm: types.ChecksumAlgorithmSha256, // Enforce checksum validation
+		ChecksumSHA256:    aws.String(sha256),      // Base64-encoded checksum
+	}
+
+	res, err := c.Pre.PresignPutObject(ctx, input,
+		s3.WithPresignExpires(expire),
+	)
+
+	if err != nil {
+		return "", fmt.Errorf("presign put: %w", err)
+	}
+
+	slog.Debug("Generated PUT URL with checksum validation", 
+		"sha256", sha256, 
+		"expire", expire)
+	return res.URL, nil
+}
+
+// GetURL generates a presigned URL for download (default expiry)
+func (c *Client) GetURL(ctx context.Context, sha256 string) (string, error) {
+	return c.GetURLExpire(ctx, sha256, c.Opt.TTL)
+}
+
+// GetURLExpire generates a presigned URL for download with custom expiry
+func (c *Client) GetURLExpire(ctx context.Context, sha256 string, expire time.Duration) (string, error) {
+	input := &s3.GetObjectInput{
+		Bucket: aws.String(c.Opt.Bucket),
+		Key:    aws.String(c.Key(sha256)),
+	}
+
+	res, err := c.Pre.PresignGetObject(ctx, input,
+		s3.WithPresignExpires(expire),
+	)
+	if err != nil {
+		return "", fmt.Errorf("presign get: %w", err)
+	}
+
+	slog.Debug("Generated GET URL", "sha256", sha256, "expire", expire)
+	return res.URL, nil
 }

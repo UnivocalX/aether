@@ -2,16 +2,13 @@ package handlers
 
 import (
 	"net/http"
-	"time"
-	
+
 	"github.com/gin-gonic/gin"
-	"github.com/UnivocalX/aether/internal/api/models"
 )
 
-func HealthCheck(c *gin.Context) {
-	response := models.Response{
-		Message: "Service is healthy",
-		Data:    gin.H{"status": "ok", "timestamp": time.Now()},
+// HealthCheck returns a gin.HandlerFunc.
+func HealthCheck() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	}
-	c.JSON(http.StatusOK, response)
 }

@@ -2,42 +2,34 @@ package registry
 
 import (
 	"fmt"
-	"strings"
+	"time"
 )
 
-type Config struct {
-	S3Endpoint string
-	Bucket     string
-	Prefix     string
+type Options struct {
+	S3Endpoint string        `json:"endpoint"`
+	Bucket     string        `json:"bucket"`
+	Prefix     string        `json:"prefix"`
+	TTL        time.Duration `json:"ttl"` // Default expiry
 }
 
-// Validate checks if the configuration is valid
-func (cfg *Config) Validate() error {
-    var errs []string
+// Normalize checks configuration
+func (o *Options) Normalize() error {
+	if o.Bucket == "" {
+		return fmt.Errorf("bucket required")
+	}
 
-    if cfg.S3Endpoint == "" {
-        errs = append(errs, "S3Endpoint is required")
-    }
+	// Set default TTL
+	if o.TTL == 0 {
+		o.TTL = 15 * time.Minute
+	}
 
-    if cfg.Bucket == "" {
-        errs = append(errs, "Bucket is required")
-    } else if strings.Contains(cfg.Bucket, " ") {
-        errs = append(errs, "Bucket cannot contain spaces")
-    }
+	// Validate TTL bounds
+	if o.TTL < time.Minute {
+		return fmt.Errorf("TTL too short")
+	}
+	if o.TTL > 7*24*time.Hour {
+		return fmt.Errorf("TTL too long")
+	}
 
-    // Prefix is optional, but if provided, should be valid
-    if cfg.Prefix != "" {
-        if strings.HasPrefix(cfg.Prefix, "/") || strings.HasSuffix(cfg.Prefix, "/") {
-            errs = append(errs, "Prefix should not start or end with '/'")
-        }
-        if strings.Contains(cfg.Prefix, "//") {
-            errs = append(errs, "Prefix cannot contain consecutive slashes")
-        }
-    }
-
-    if len(errs) > 0 {
-        return fmt.Errorf("%s", strings.Join(errs, "; "))
-    }
-
-    return nil
+	return nil
 }
