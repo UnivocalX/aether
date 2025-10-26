@@ -10,21 +10,11 @@ import (
 	"github.com/UnivocalX/aether/pkg/registry"
 )
 
-type Options struct {
-	Registry   *registry.Options
-	Production bool
-}
-
 // New returns a router that uses your logging middleware instead of Gin's default logger.
-func New(opt *Options) (*gin.Engine, error) {
-	slog.Debug("Setting up new API router")
-	client, err := registry.New(opt.Registry)
+func New(engine *registry.Engine, prod bool) (*gin.Engine, error) {
+	slog.Info("Setting up new API router")
 
-	if err != nil {
-		return nil, err
-	}
-
-	if opt.Production {
+	if prod {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
@@ -37,7 +27,7 @@ func New(opt *Options) (*gin.Engine, error) {
 	v1.GET("/health", handlers.HealthCheck())
 
 	// Data endpoints
-	dataHandler := handlers.NewDataHandler(client)
+	dataHandler := handlers.NewDataHandler(engine)
 	v1.POST("/data/:sha256", dataHandler.Create)
 
 	return router, nil

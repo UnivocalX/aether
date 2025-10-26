@@ -11,7 +11,6 @@ import (
 	"github.com/fatih/color"
 )
 
-// Options defines configuration for the logger initialization.
 type Options struct {
 	AddSource  bool
 	Production bool
@@ -20,7 +19,6 @@ type Options struct {
 
 func (opt *Options) GetLevelValue() (slog.Level, error) {
 	level := strings.ToLower(opt.Level)
-
 	switch level {
 	case "info":
 		return slog.LevelInfo, nil
@@ -35,49 +33,56 @@ func (opt *Options) GetLevelValue() (slog.Level, error) {
 	}
 }
 
-// colorfulHandler implements slog.Handler for development with colors.
+// colorfulHandler implements slog.Handler with inline colorful formatting
 type colorfulHandler struct {
 	handler slog.Handler
 	level   slog.Level
 }
 
-func (h *colorfulHandler) Enabled(ctx context.Context, level slog.Level) bool {
+func (h *colorfulHandler) Enabled(_ context.Context, level slog.Level) bool {
 	return level >= h.level
 }
 
-func (h *colorfulHandler) Handle(ctx context.Context, r slog.Record) error {
-	var msgColor *color.Color
+func (h *colorfulHandler) Handle(_ context.Context, r slog.Record) error {
+	// Choose color based on level
+	var levelColor *color.Color
 	switch r.Level {
 	case slog.LevelDebug:
-		msgColor = color.New(color.FgHiCyan)
+		levelColor = color.New(color.FgHiCyan)
 	case slog.LevelInfo:
-		msgColor = color.New(color.FgHiGreen)
+		levelColor = color.New(color.FgHiGreen)
 	case slog.LevelWarn:
-		msgColor = color.New(color.FgHiYellow)
+		levelColor = color.New(color.FgHiYellow)
 	case slog.LevelError:
-		msgColor = color.New(color.FgHiRed)
+		levelColor = color.New(color.FgHiRed)
 	default:
-		msgColor = color.New(color.FgWhite)
+		levelColor = color.New(color.FgWhite)
 	}
 
-	// Print the log message
-	msgColor.Println(r.Message)
+	// Format timestamp
+	timestamp := color.HiBlackString(r.Time.Format("15:04:05"))
+	levelStr := levelColor.Sprintf("[%s]", strings.ToUpper(r.Level.String()))
+	msgStr := levelColor.Sprintf("%s", r.Message)
 
-	// Print structured attributes if any
-	if r.NumAttrs() > 0 {
-		r.Attrs(func(attr slog.Attr) bool {
-			key := color.HiCyanString("  " + attr.Key + ":")
-			value := formatValue(attr.Value)
-			fmt.Printf("%s %v\n", key, value)
-			return true
-		})
-		fmt.Println()
+	// Collect structured attributes inline
+	attrParts := make([]string, 0, r.NumAttrs())
+	r.Attrs(func(attr slog.Attr) bool {
+		key := color.HiCyanString(attr.Key)
+		value := formatValueInline(attr.Value)
+		attrParts = append(attrParts, fmt.Sprintf("%s=%s", key, value))
+		return true
+	})
+
+	attrsStr := ""
+	if len(attrParts) > 0 {
+		attrsStr = " " + strings.Join(attrParts, " ")
 	}
 
+	fmt.Printf("%s %s %s%s\n", timestamp, levelStr, msgStr, attrsStr)
 	return nil
 }
 
-func formatValue(value slog.Value) interface{} {
+func formatValueInline(value slog.Value) string {
 	switch value.Kind() {
 	case slog.KindString:
 		return color.WhiteString("%q", value.String())
@@ -111,7 +116,6 @@ func (h *colorfulHandler) WithGroup(name string) slog.Handler {
 // Setup sets up and installs the logger as the global default slog logger.
 func Setup(opt *Options) error {
 	level, err := opt.GetLevelValue()
-
 	if err != nil {
 		return err
 	}
@@ -144,8 +148,7 @@ func Setup(opt *Options) error {
 	return nil
 }
 
-// SetupDefault initializes a development-friendly default logger.
-func SetupDefault() { 
+func SetupDefault() {
 	Setup(&Options{
 		AddSource:  false,
 		Production: false,

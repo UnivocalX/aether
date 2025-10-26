@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"log/slog"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -18,36 +19,68 @@ var serveCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(serveCmd)
+
+	// Storage
 	serveCmd.Flags().Int("port", 8080, "Port to run the server on")
-	serveCmd.Flags().String("s3endpoint", "", "Port to run the server on")
-	serveCmd.Flags().String("bucket", "", "Port to run the server on")
-	serveCmd.Flags().String("prefix", "aether", "Port to run the server on")
+	serveCmd.Flags().String("s3endpoint", "", "S3 endpoint")
+	serveCmd.Flags().String("bucket", "", "S3 bucket.")
+	serveCmd.Flags().String("prefix", "aether", "S3 prefix.")
+
+	// Datastore
+	serveCmd.Flags().String("db-endpoint", "localhost:5432", "Database port.")
+	serveCmd.Flags().String("db-user", "postgres", "")
+	serveCmd.Flags().String("db-password", "changeme", "Port to run the server on")
+	serveCmd.Flags().String("db-name", "postgres", "Database name.")
+	serveCmd.Flags().Bool("ssl", false, "Database SSL.")
+}
+
+func LoadEngineConfig() (*registry.Config, error) {
+	cfg := registry.NewConfig()
+
+	// Storage
+	cfg.Storage.S3Endpoint = viper.GetString("s3endpoint")
+	cfg.Storage.Bucket = viper.GetString("bucket")
+	cfg.Storage.Prefix = viper.GetString("Prefix")
+
+	// Datastore
+	cfg.Datastore.Endpoint = registry.Endpoint(viper.GetString("db-endpoint"))
+	cfg.Datastore.User = viper.GetString("db-user")
+	cfg.Datastore.Password = viper.GetString("db-password")
+	cfg.Datastore.Name = viper.GetString("db-name")
+	cfg.Datastore.SSL = viper.GetBool("ssl")
+
+	slog.Info("EngineConfig",
+		"Storage", cfg.Storage,
+		"Datastore", cfg.Datastore,
+	)
+
+	return cfg, nil
 }
 
 func startServer(cmd *cobra.Command, args []string) error {
-	opt := api.Options{
-		Registry: &registry.Options{
-			S3Endpoint: viper.GetString("s3endpoint"),
-			Bucket:     viper.GetString("bucket"),
-			Prefix:     viper.GetString("prefix"),
-		},
-		Production: viper.GetBool("production"),
-	}
+	// Get Config
+	port := viper.GetString("port")
+	prod := viper.GetBool("production")
 
-	router, err := api.New(&opt)
+	cfg, err := LoadEngineConfig()
 	if err != nil {
 		return err
 	}
 
-	slog.Info("Starting API server",
-		"port", viper.GetInt("port"),
-		"s3endpoint", opt.Registry.S3Endpoint,
-		"bucket", opt.Registry.Bucket,
-		"prefix", opt.Registry.Prefix,
-		"production", opt.Production,
-	)
+	// Create engine
+	engine, err := registry.New(cfg)
+	if err != nil {
+		return nil
+	}
 
-	err = router.Run(":" + viper.GetString("port"))
+	// Create API
+	router, err := api.New(engine, prod)
+	if err != nil {
+		return err
+	}
+
+	// Run Server
+	err = router.Run(":" + port)
 	if err != nil {
 		return err
 	}

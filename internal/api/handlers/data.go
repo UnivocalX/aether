@@ -10,14 +10,14 @@ import (
 )
 
 type DataHandler struct {
-	Registry *registry.Client
+	registry *registry.Engine
 }
 
-func NewDataHandler(reg *registry.Client) *DataHandler {
-	return &DataHandler{Registry: reg}
+func NewDataHandler(reg *registry.Engine) *DataHandler {
+	return &DataHandler{registry: reg}
 }
 
-func (h *DataHandler) Create(c *gin.Context) {
+func (handler *DataHandler) Create(c *gin.Context) {
 	var req models.CreateDataRequest
 
 	// Bind URI parameters
@@ -41,7 +41,7 @@ func (h *DataHandler) Create(c *gin.Context) {
 	}
 
 	// Business logic
-	url, err := h.Registry.PutURL(c.Request.Context(), req.SHA256)
+	url, err := handler.registry.PutURL(c.Request.Context(), req.SHA256)
 	if err != nil {
 		slog.ErrorContext(c.Request.Context(), "Failed to generate presigned URL",
 			"error", err, "sha256", req.SHA256,
@@ -54,7 +54,7 @@ func (h *DataHandler) Create(c *gin.Context) {
 	data := models.CreateResponseData{
 		SHA256:       req.SHA256,
 		PresignedURL: url,
-		Expiry:       h.Registry.Opt.TTL.String(),
+		Expiry:       handler.registry.Config.Storage.TTL.String(),
 	}
 
 	slog.InfoContext(c.Request.Context(), "Generated presigned URL", "sha256", req.SHA256, "Expiry", data.Expiry)
