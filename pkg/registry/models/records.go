@@ -2,14 +2,14 @@ package models
 
 import (
 	"gorm.io/gorm"
+
+	"gorm.io/datatypes"
 )
 
 type Asset struct {
 	gorm.Model
-	MimeType        string
-	SizeBytes       int64
+	Metadata        datatypes.JSON   `gorm:"type:jsonb"`
 	Checksum        string           `gorm:"uniqueIndex;not null;size:64"`
-	Key             string           `gorm:"uniqueIndex;not null"`
 	Display         string           `gorm:"size:500"`
 	State           Status           `gorm:"type:status;not null;default:'pending'"`
 	Tags            []Tag            `gorm:"many2many:asset_tags;"`

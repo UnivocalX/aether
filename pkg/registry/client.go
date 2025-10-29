@@ -6,14 +6,23 @@ import (
 	"log/slog"
 	"path"
 	"time"
+	"errors"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 
+	"github.com/UnivocalX/aether/pkg/registry/models"
+
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+)
+
+// Define sentinel errors
+var (
+	ErrAssetNotFound = errors.New("asset not found")
+	ErrTagNotFound   = errors.New("tag not found")
 )
 
 type Engine struct {
@@ -78,7 +87,7 @@ func New(cfg *Config) (*Engine, error) {
 		"s3endpoint", cfg.Storage.S3Endpoint,
 		"bucket", cfg.Storage.Bucket,
 		"prefix", cfg.Storage.Prefix,
-		"datastore", fmt.Sprintf("%s:%d", cfg.Datastore.Endpoint.GetHost(), cfg.Datastore.Endpoint.GetPort),
+		"datastore", fmt.Sprintf("%s:%d", cfg.Datastore.Endpoint.GetHost(), cfg.Datastore.Endpoint.GetPort()),
 	)
 
 	return engine, nil
@@ -95,9 +104,14 @@ func (engine *Engine) Ping(ctx context.Context) error {
 	return nil
 }
 
-// Key generates the S3 key path
-func (engine *Engine) Key(sha256 string) string {
-	return path.Join(engine.Config.Storage.Prefix, sha256)
+// IngressKey generates the ingress S3 key path
+func (engine *Engine) IngressKey(sha256 string) string {
+	return path.Join(engine.Config.Storage.Prefix, "ingress", sha256)
+}
+
+// CuratedKey generates the curated S3 key path
+func (engine *Engine) CuratedKey(sha256 string) string {
+	return path.Join(engine.Config.Storage.Prefix, "curated", sha256)
 }
 
 // PutURL generates a presigned URL for upload (default expiry)
@@ -109,7 +123,7 @@ func (engine *Engine) PutURL(ctx context.Context, sha256 string) (string, error)
 func (engine *Engine) PutURLExpire(ctx context.Context, sha256 string, expire time.Duration) (string, error) {
 	input := &s3.PutObjectInput{
 		Bucket:            aws.String(engine.Config.Storage.Bucket),
-		Key:               aws.String(engine.Key(sha256)),
+		Key:               aws.String(engine.IngressKey(sha256)),
 		ChecksumAlgorithm: types.ChecksumAlgorithmSha256, // Enforce checksum validation
 		ChecksumSHA256:    aws.String(sha256),            // Base64-encoded checksum
 	}
@@ -137,7 +151,7 @@ func (engine *Engine) GetURL(ctx context.Context, sha256 string) (string, error)
 func (engine *Engine) GetURLExpire(ctx context.Context, sha256 string, expire time.Duration) (string, error) {
 	input := &s3.GetObjectInput{
 		Bucket: aws.String(engine.Config.Storage.Bucket),
-		Key:    aws.String(engine.Key(sha256)),
+		Key:    aws.String(engine.CuratedKey(sha256)),
 	}
 
 	res, err := engine.Pre.PresignGetObject(ctx, input,
@@ -149,4 +163,94 @@ func (engine *Engine) GetURLExpire(ctx context.Context, sha256 string, expire ti
 
 	slog.Debug("Generated GET URL", "sha256", sha256, "expire", expire)
 	return res.URL, nil
+}
+
+func (engine *Engine) CreateAssetRecord(ctx context.Context, sha256 string, display string) (*models.Asset, error) {
+	slog.Info("Creating asset", "display", display, "checksum", sha256)
+
+	asset := &models.Asset{
+		Checksum: sha256,
+		Display:  display,
+	}
+
+	if err := engine.DB.Create(asset).Error; err != nil {
+		return nil, err
+	}
+
+	return asset, nil
+}
+
+func (engine *Engine) GetAssetRecord(ctx context.Context, sha256 string) (*models.Asset, error) {
+    normalizedSha256 := models.NormalizeName(sha256)
+    slog.Info("Getting asset", "checksum", normalizedSha256)
+
+    var asset models.Asset
+    err := engine.DB.Where("checksum = ?", normalizedSha256).First(&asset).Error
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &asset, nil
+}
+
+func (engine *Engine) CreateTagRecord(ctx context.Context, name string) (*models.Tag, error) {
+	slog.Info(fmt.Sprintf("Creating tag: %s", name))
+
+	tag := &models.Tag{
+		Name: name,
+	}
+
+	if err := engine.DB.Create(tag).Error; err != nil {
+		return nil, err
+	}
+
+	return tag, nil
+}
+
+func (engine *Engine) GetTagRecord(ctx context.Context, name string) (*models.Tag, error) {
+	normalizedName := models.NormalizeName(name)
+	slog.Debug("Getting tag", "name", normalizedName)
+
+	var tag models.Tag
+	err := engine.DB.Where("name = ?", normalizedName).First(&tag).Error
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrAssetNotFound
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &tag, nil
+}
+
+func (engine *Engine) AssociateTagWithAsset(assetID uint, tagID uint) error {
+	slog.Debug("Attempting to associate tag with asset", "AssetID", assetID, "tagID", tagID)
+	
+	var asset models.Asset
+	if err := engine.DB.First(&asset, assetID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrAssetNotFound
+		}
+		return err
+	}
+
+	var tag models.Tag
+	if err := engine.DB.First(&tag, tagID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrTagNotFound
+		}
+		return err
+	}
+
+	if err := engine.DB.Model(&asset).Association("Tags").Append(&tag); err != nil {
+		return err
+	}
+	return nil
 }

@@ -111,9 +111,6 @@ func (cfg *StorageCFG) Validate() error {
 	if cfg.Bucket == "" {
 		return fmt.Errorf("bucket required")
 	}
-	if cfg.S3Endpoint == "" {
-		return fmt.Errorf("s3 endpoint required")
-	}
 	if cfg.TTL < time.Minute {
 		return fmt.Errorf("TTL too short: minimum 1 minute")
 	}

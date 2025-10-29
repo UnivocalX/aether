@@ -1,8 +1,8 @@
 package utils
 
 import (
-	"encoding/base64"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -36,7 +36,6 @@ func ValidateSHA256(hash string) error {
 	}
 	return nil
 }
-
 
 // hexToBase64SHA256 converts hex-encoded SHA256 to base64
 func HexToBase64SHA256(hexSHA256 string) (string, error) {

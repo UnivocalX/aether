@@ -1,11 +1,19 @@
 package models
 
 import (
+	"errors"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"regexp"
 	"strings"
 
+	"encoding/json"
 	"gorm.io/gorm"
+)
+
+var (
+	ErrValidation = errors.New("validation error")
 )
 
 type PeerType string
@@ -17,6 +25,7 @@ const (
 type Status string
 
 const (
+	StatusRejected Status = "rejected"
 	StatusPending Status = "pending"
 	StatusReady   Status = "ready"
 	StatusDeleted Status = "deleted"
@@ -51,11 +60,63 @@ func GeneratePeerName(id uint, baseName string, peerType PeerType) string {
 	return fmt.Sprintf("%s-%s-%d", cleanBaseName, peerType, id)
 }
 
+func ValidateSHA256(hash string) error {
+	h := strings.TrimSpace(hash)
+	if len(h) != sha256.Size*2 {
+		return fmt.Errorf("invalid SHA256 hash length: %d", len(h))
+	}
+	if _, err := hex.DecodeString(h); err != nil {
+		return fmt.Errorf("invalid SHA256 hex: %w", err)
+	}
+	return nil
+}
+
+// Hooks for Asset
+func (a *Asset) BeforeSave(tx *gorm.DB) error {
+	a.Display = NormalizeName(a.Display)
+	if !ValidateName(a.Display) {
+		return fmt.Errorf("%w: asset Display contains invalid characters", ErrValidation)
+	}
+
+	// Set default state if empty
+	if a.State == "" {
+		a.State = StatusPending
+	}
+
+	// Validate state
+	if !a.State.IsValid() {
+		return fmt.Errorf("invalid asset state: %s", a.State)
+	}
+
+	if err := ValidateSHA256(a.Checksum); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (a *Asset) BeforeUpdate(tx *gorm.DB) error {
+	if len(a.Metadata) == 0 {
+		return fmt.Errorf("%w: metadata is required", ErrValidation)
+	}
+
+	var meta AssetMetadata
+	if err := json.Unmarshal(a.Metadata, &meta); err != nil {
+		return fmt.Errorf("invalid metadata format: %w", err)
+	}
+
+	if err := meta.Validate(); err != nil {
+		return fmt.Errorf("metadata validation failed: %w", err)
+	}
+
+	return nil
+}
+
 // BeforeSave hook to normalize tag name
 func (t *Tag) BeforeSave(tx *gorm.DB) error {
 	t.Name = NormalizeName(t.Name)
 	if !ValidateName(t.Name) {
-		return fmt.Errorf("tag name contains invalid characters")
+		return fmt.Errorf("%w: tag name contains invalid characters", ErrValidation)
 	}
 	return nil
 }
@@ -64,7 +125,7 @@ func (t *Tag) BeforeSave(tx *gorm.DB) error {
 func (d *Dataset) BeforeSave(tx *gorm.DB) error {
 	d.Name = NormalizeName(d.Name)
 	if !ValidateName(d.Name) {
-		return fmt.Errorf("dataset name contains invalid characters")
+		return fmt.Errorf("%w: dataset name contains invalid characters", ErrValidation)
 	}
 	return nil
 }
@@ -73,7 +134,7 @@ func (d *Dataset) BeforeSave(tx *gorm.DB) error {
 func (dv *DatasetVersion) BeforeSave(tx *gorm.DB) error {
 	dv.Display = NormalizeName(dv.Display)
 	if !ValidateName(dv.Display) {
-		return fmt.Errorf("dataset version name contains invalid characters")
+		return fmt.Errorf("%w: dataset version name contains invalid characters", ErrValidation)
 	}
 	return nil
 }
@@ -91,26 +152,6 @@ func (dv *DatasetVersion) BeforeCreate(tx *gorm.DB) error {
 		}
 		dv.Number = maxVersion + 1
 	}
-	return nil
-}
-
-// Hooks for Asset
-func (a *Asset) BeforeSave(tx *gorm.DB) error {
-	a.Display = NormalizeName(a.Display)
-	if !ValidateName(a.Display) {
-		return fmt.Errorf("asset Display contains invalid characters")
-	}
-
-	// Set default state if empty
-	if a.State == "" {
-		a.State = StatusPending
-	}
-
-	// Validate state
-	if !a.State.IsValid() {
-		return fmt.Errorf("invalid asset state: %s", a.State)
-	}
-
 	return nil
 }
 
@@ -136,7 +177,7 @@ func (p *Peer) BeforeCreate(tx *gorm.DB) error {
 	// Normalize base name
 	p.Display = NormalizeName(p.Display)
 	if !ValidateName(p.Display) {
-		return fmt.Errorf("peer base name contains invalid characters")
+		return fmt.Errorf("%w: peer base name contains invalid characters", ErrValidation)
 	}
 
 	return nil

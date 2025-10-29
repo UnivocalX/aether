@@ -15,6 +15,7 @@ var serveCmd = &cobra.Command{
 	Use:   "serve",
 	Short: "Starts the aether api server",
 	RunE:  startServer,
+	SilenceErrors: true,
 }
 
 func init() {
@@ -49,7 +50,7 @@ func LoadEngineConfig() (*registry.Config, error) {
 	cfg.Datastore.Name = viper.GetString("db-name")
 	cfg.Datastore.SSL = viper.GetBool("ssl")
 
-	slog.Info("EngineConfig",
+	slog.Info("EngineConfig,",
 		"Storage", cfg.Storage,
 		"Datastore", cfg.Datastore,
 	)
@@ -58,6 +59,8 @@ func LoadEngineConfig() (*registry.Config, error) {
 }
 
 func startServer(cmd *cobra.Command, args []string) error {
+	slog.Info("Starting server")
+
 	// Get Config
 	port := viper.GetString("port")
 	prod := viper.GetBool("production")
@@ -70,18 +73,17 @@ func startServer(cmd *cobra.Command, args []string) error {
 	// Create engine
 	engine, err := registry.New(cfg)
 	if err != nil {
-		return nil
-	}
-
-	// Create API
-	router, err := api.New(engine, prod)
-	if err != nil {
+		slog.Error("Failed to create registry engine.")
 		return err
 	}
 
+	// Create API
+	router := api.New(engine, prod)
+
 	// Run Server
-	err = router.Run(":" + port)
-	if err != nil {
+	slog.Info("Serving:", "port", port, "mode", prod)
+	if err := router.Run(":" + port); err != nil {
+		slog.Error("Failed to run server.")
 		return err
 	}
 

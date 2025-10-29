@@ -11,7 +11,7 @@ import (
 )
 
 // New returns a router that uses your logging middleware instead of Gin's default logger.
-func New(engine *registry.Engine, prod bool) (*gin.Engine, error) {
+func New(engine *registry.Engine, prod bool) *gin.Engine {
 	slog.Info("Setting up new API router")
 
 	if prod {
@@ -27,8 +27,9 @@ func New(engine *registry.Engine, prod bool) (*gin.Engine, error) {
 	v1.GET("/health", handlers.HealthCheck())
 
 	// Data endpoints
-	dataHandler := handlers.NewDataHandler(engine)
-	v1.POST("/data/:sha256", dataHandler.Create)
+	registryHandler := handlers.NewRegistryHandler(engine)
+	v1.POST("/data/:sha256", registryHandler.CreateAsset)
+	v1.POST("/tag/:name", registryHandler.CreateTag)
 
-	return router, nil
+	return router
 }

@@ -21,7 +21,9 @@ var rootCmd = &cobra.Command{
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
 	err := rootCmd.Execute()
+
 	if err != nil {
+		slog.Error(err.Error())
 		os.Exit(1)
 	}
 }
@@ -50,7 +52,7 @@ func Setup(cmd *cobra.Command, args []string) error {
 		slog.Error("Failed to set up logger", "error", err)
 	}
 
-	slog.Debug("Configuration loaded",
+	slog.Debug("Configuration loaded,",
 		"ConfigFile", viper.ConfigFileUsed(),
 		"Level", viper.GetString("level"),
 		"Production", viper.GetBool("production"),
