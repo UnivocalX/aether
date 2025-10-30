@@ -1,20 +1,23 @@
 package cmd
 
 import (
+	"fmt"
 	"log/slog"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
 	"github.com/UnivocalX/aether/internal/api"
+	"github.com/UnivocalX/aether/internal/logging"
 	"github.com/UnivocalX/aether/pkg/registry"
 )
 
 // serveCmd represents the serve command
 var serveCmd = &cobra.Command{
-	Use:   "serve",
-	Short: "Starts the aether api server",
-	RunE:  startServer,
+	Use:           "serve",
+	Short:         "Starts the aether api server",
+	RunE:          startServer,
+	SilenceUsage: true,
 	SilenceErrors: true,
 }
 
@@ -33,57 +36,49 @@ func init() {
 	serveCmd.Flags().String("db-password", "changeme", "Port to run the server on")
 	serveCmd.Flags().String("db-name", "postgres", "Database name.")
 	serveCmd.Flags().Bool("ssl", false, "Database SSL.")
+	serveCmd.Flags().Bool("production", false, "Run in production mode (enables JSON logging)")
 }
 
-func LoadEngineConfig() (*registry.Config, error) {
-	cfg := registry.NewConfig()
+func LoadAPIConfig() api.Config {
+	registryCFG := registry.NewConfig()
 
 	// Storage
-	cfg.Storage.S3Endpoint = viper.GetString("s3endpoint")
-	cfg.Storage.Bucket = viper.GetString("bucket")
-	cfg.Storage.Prefix = viper.GetString("Prefix")
+	registryCFG.Storage.S3Endpoint = viper.GetString("s3endpoint")
+	registryCFG.Storage.Bucket = viper.GetString("bucket")
+	registryCFG.Storage.Prefix = viper.GetString("Prefix")
 
 	// Datastore
-	cfg.Datastore.Endpoint = registry.Endpoint(viper.GetString("db-endpoint"))
-	cfg.Datastore.User = viper.GetString("db-user")
-	cfg.Datastore.Password = viper.GetString("db-password")
-	cfg.Datastore.Name = viper.GetString("db-name")
-	cfg.Datastore.SSL = viper.GetBool("ssl")
+	registryCFG.Datastore.Endpoint = registry.Endpoint(viper.GetString("db-endpoint"))
+	registryCFG.Datastore.User = viper.GetString("db-user")
+	registryCFG.Datastore.Password = registry.Secret(viper.GetString("db-password"))
+	registryCFG.Datastore.Name = viper.GetString("db-name")
+	registryCFG.Datastore.SSL = viper.GetBool("ssl")
 
-	slog.Info("EngineConfig,",
-		"Storage", cfg.Storage,
-		"Datastore", cfg.Datastore,
-	)
-
-	return cfg, nil
+	return api.Config{
+		Registry: registryCFG,
+		Logging: &logging.Config{
+			Prod:     viper.GetBool("production"),
+			AppName:  "aether",
+			LogLevel: logging.LevelFromString("debug"),
+		},
+		Port: viper.GetString("port"),
+	}
 }
 
 func startServer(cmd *cobra.Command, args []string) error {
-	slog.Info("Starting server")
-
-	// Get Config
-	port := viper.GetString("port")
-	prod := viper.GetBool("production")
-
-	cfg, err := LoadEngineConfig()
-	if err != nil {
-		return err
-	}
-
-	// Create engine
-	engine, err := registry.New(cfg)
-	if err != nil {
-		slog.Error("Failed to create registry engine.")
-		return err
-	}
+	cfg := LoadAPIConfig()
+	slog.Info("Starting server...")
 
 	// Create API
-	router := api.New(engine, prod)
+	router, err := api.New(&cfg)
+	if err != nil {
+		return fmt.Errorf("failed to start server")
+	}
 
 	// Run Server
-	slog.Info("Serving:", "port", port, "mode", prod)
-	if err := router.Run(":" + port); err != nil {
-		slog.Error("Failed to run server.")
+	slog.Info("serving:", "port", cfg.Port, "production", cfg.Logging.Prod)
+	if err := router.Run(":" + cfg.Port); err != nil {
+		slog.Error("failed to run server.")
 		return err
 	}
 

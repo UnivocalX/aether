@@ -31,7 +31,7 @@ func Setup(cmd *cobra.Command) error {
 			return err
 		}
 
-		// Search for a config file with the name "config" (without extension).
+		// Search for a config file with the name "config.yaml"
 		viper.AddConfigPath(".")
 		viper.AddConfigPath(home + "/.aether")
 		viper.SetConfigName("config")
@@ -43,6 +43,7 @@ func Setup(cmd *cobra.Command) error {
 	// to ignore "file not found" errors, but panic on any other error.
 	if err := viper.ReadInConfig(); err != nil {
 		// It's okay if the config file doesn't exist.
+
 		var configFileNotFoundError viper.ConfigFileNotFoundError
 		if !errors.As(err, &configFileNotFoundError) {
 			return err

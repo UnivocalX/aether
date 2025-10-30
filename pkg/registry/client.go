@@ -2,11 +2,11 @@ package registry
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"path"
 	"time"
-	"errors"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -34,7 +34,12 @@ type Engine struct {
 
 // New creates new core engine
 func New(cfg *Config) (*Engine, error) {
-	slog.Debug("Creating engine")
+	slog.Debug("Creating engine",
+		"storageEndpoint", cfg.Storage.S3Endpoint,
+		"storageBucket", cfg.Storage.Bucket,
+		"storagePrefix", cfg.Storage.Prefix,
+		"datastore", fmt.Sprintf("%s:%d", cfg.Datastore.Endpoint.GetHost(), cfg.Datastore.Endpoint.GetPort()),
+	)
 
 	if err := cfg.Normalize(); err != nil {
 		return nil, err
@@ -82,13 +87,6 @@ func New(cfg *Config) (*Engine, error) {
 	if err := engine.Ping(context.Background()); err != nil {
 		return nil, fmt.Errorf("connection failed: %w", err)
 	}
-
-	slog.Debug("Engine ready",
-		"s3endpoint", cfg.Storage.S3Endpoint,
-		"bucket", cfg.Storage.Bucket,
-		"prefix", cfg.Storage.Prefix,
-		"datastore", fmt.Sprintf("%s:%d", cfg.Datastore.Endpoint.GetHost(), cfg.Datastore.Endpoint.GetPort()),
-	)
 
 	return engine, nil
 }
@@ -166,7 +164,7 @@ func (engine *Engine) GetURLExpire(ctx context.Context, sha256 string, expire ti
 }
 
 func (engine *Engine) CreateAssetRecord(ctx context.Context, sha256 string, display string) (*models.Asset, error) {
-	slog.Info("Creating asset", "display", display, "checksum", sha256)
+	slog.Debug("Creating asset", "display", display, "checksum", sha256)
 
 	asset := &models.Asset{
 		Checksum: sha256,
@@ -181,11 +179,11 @@ func (engine *Engine) CreateAssetRecord(ctx context.Context, sha256 string, disp
 }
 
 func (engine *Engine) GetAssetRecord(ctx context.Context, sha256 string) (*models.Asset, error) {
-    normalizedSha256 := models.NormalizeName(sha256)
-    slog.Info("Getting asset", "checksum", normalizedSha256)
+	normalizedSha256 := models.NormalizeName(sha256)
+	slog.Debug("Getting asset", "checksum", normalizedSha256)
 
-    var asset models.Asset
-    err := engine.DB.Where("checksum = ?", normalizedSha256).First(&asset).Error
+	var asset models.Asset
+	err := engine.DB.Where("checksum = ?", normalizedSha256).First(&asset).Error
 
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
@@ -199,7 +197,7 @@ func (engine *Engine) GetAssetRecord(ctx context.Context, sha256 string) (*model
 }
 
 func (engine *Engine) CreateTagRecord(ctx context.Context, name string) (*models.Tag, error) {
-	slog.Info(fmt.Sprintf("Creating tag: %s", name))
+	slog.Debug(fmt.Sprintf("Creating tag: %s", name))
 
 	tag := &models.Tag{
 		Name: name,
@@ -232,7 +230,7 @@ func (engine *Engine) GetTagRecord(ctx context.Context, name string) (*models.Ta
 
 func (engine *Engine) AssociateTagWithAsset(assetID uint, tagID uint) error {
 	slog.Debug("Attempting to associate tag with asset", "AssetID", assetID, "tagID", tagID)
-	
+
 	var asset models.Asset
 	if err := engine.DB.First(&asset, assetID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {

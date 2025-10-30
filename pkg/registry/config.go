@@ -8,6 +8,7 @@ import (
 )
 
 type Endpoint string
+type Secret string
 
 func (e Endpoint) GetHost() string {
 	parts := strings.Split(string(e), ":")
@@ -28,7 +29,7 @@ func (e Endpoint) GetPort() int {
 	return 0
 }
 
-// Config is the root configuration for aether
+// Config is the root configuration for registry
 type Config struct {
 	Storage   StorageCFG   `json:"storage"`
 	Datastore DatastoreCFG `json:"datastore"`
@@ -38,7 +39,7 @@ type Config struct {
 type DatastoreCFG struct {
 	Endpoint Endpoint `json:"endpoint"`
 	User     string   `json:"user"`
-	Password string   `json:"password"`
+	Password Secret   `json:"password"`
 	Name     string   `json:"name"`
 	SSL      bool     `json:"ssl"`
 	TimeZone string   `json:"timezone"`
@@ -193,14 +194,18 @@ func (cfg *DatastoreCFG) URL() string {
 // String redacts sensitive fields when printing
 func (cfg DatastoreCFG) String() string {
 	return fmt.Sprintf(
-		"DatastoreCFG{Endpoint:%s, User:%q, Name:%q, SSL:%t, TimeZone:%q, Password:REDACTED}",
-		cfg.Endpoint, cfg.User, cfg.Name, cfg.SSL, cfg.TimeZone,
+		"DatastoreCFG{Endpoint:%s, User:%q, Name:%q, SSL:%t, TimeZone:%q, Password:%q}",
+		cfg.Endpoint, cfg.User, cfg.Name, cfg.SSL, cfg.TimeZone, cfg.Password,
 	)
 }
 
 func (cfg Config) String() string {
 	return fmt.Sprintf(
-		"AetherConfig{Storage:%s, Datastore:%s}",
+		"RegistryConfig{Storage:%s, Datastore:%s}",
 		cfg.Storage, cfg.Datastore,
 	)
+}
+
+func (s Secret) String() string {
+	return "REDACTED"
 }

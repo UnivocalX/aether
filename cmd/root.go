@@ -4,7 +4,7 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/UnivocalX/aether/internal/logger"
+	"github.com/UnivocalX/aether/internal/logging"
 	"github.com/UnivocalX/aether/internal/settings"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -29,10 +29,9 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.PersistentFlags().String("config", "", "config file (default is $HOME/.aether.yaml)")
-	rootCmd.PersistentFlags().Bool("production", false, "Run in production mode (enables JSON logging)")
+	rootCmd.PersistentFlags().String("config", "", "config file (default is $HOME/.aether/config.yaml)")
 	rootCmd.PersistentFlags().String("level", "info", "Log level (debug, info, warn, error)")
-	rootCmd.PersistentFlags().String("endpoint", "", "aether api endpoint.")
+	rootCmd.PersistentFlags().String("endpoint", "localhost:8080", "aether api endpoint.")
 	rootCmd.PersistentFlags().SetAnnotation("level", cobra.BashCompOneRequiredFlag, []string{"debug", "info", "warn", "error"})
 }
 
@@ -43,20 +42,12 @@ func Setup(cmd *cobra.Command, args []string) error {
 	}
 
 	// Setup logging
-	if err := logger.Setup(&logger.Options{
-		AddSource:  true,
-		Production: viper.GetBool("production"),
-		Level:      viper.GetString("level"),
-	}); err != nil {
-		logger.SetupDefault()
-		slog.Error("Failed to set up logger", "error", err)
-	}
+	logger := logging.New(nil, logging.LevelFromString(viper.GetString("level")))
+	slog.SetDefault(logger)
 
-	slog.Debug("Configuration loaded,",
-		"ConfigFile", viper.ConfigFileUsed(),
+	slog.Debug("Configuration loaded", 
+		"ConfigFile", viper.ConfigFileUsed(), 
 		"Level", viper.GetString("level"),
-		"Production", viper.GetBool("production"),
 	)
-
 	return nil
 }
