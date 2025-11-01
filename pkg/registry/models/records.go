@@ -8,7 +8,9 @@ import (
 
 type Asset struct {
 	gorm.Model
-	Metadata        datatypes.JSON   `gorm:"type:jsonb"`
+	MimeType        string
+	SizeBytes       int64			
+	Extra           datatypes.JSON   `gorm:"type:jsonb"`
 	Checksum        string           `gorm:"uniqueIndex;not null;size:64"`
 	Display         string           `gorm:"size:500"`
 	State           Status           `gorm:"type:status;not null;default:'pending'"`

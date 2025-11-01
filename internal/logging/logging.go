@@ -10,7 +10,6 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"time"
 )
 
 // Config holds configuration for service logging
@@ -59,32 +58,24 @@ func NewService(config *Config) (*slog.Logger, error) {
 	var consoleHandler slog.Handler
 	var fileHandler slog.Handler
 
+	// File handler is ALWAYS JSON without colors
+	fileHandler = slog.NewJSONHandler(file, &slog.HandlerOptions{
+		Level:     config.LogLevel,
+		AddSource: true,
+	})
+
 	if config.Prod {
-		// Production mode - no colors, structured output
-		consoleHandler = slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
-			Level:       config.LogLevel,
-			AddSource:   true,
-			ReplaceAttr: replaceProdAttributes,
-		})
-		// JSON for file in production
-		fileHandler = slog.NewJSONHandler(file, &slog.HandlerOptions{
-			Level:       config.LogLevel,
-			AddSource:   true,
-			ReplaceAttr: replaceProdAttributes,
+		// Production mode - JSON output without colors for console
+		consoleHandler = slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
+			Level:     config.LogLevel,
+			AddSource: true,
 		})
 	} else {
-		// Development mode - with colors and friendly formatting
-		consoleHandler = slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
-			Level:       config.LogLevel,
-			AddSource:   true,
-			ReplaceAttr: replaceDevAttributes,
-		})
-		// JSON for file in development
-		fileHandler = slog.NewJSONHandler(file, &slog.HandlerOptions{
-			Level:       config.LogLevel,
-			AddSource:   true,
-			ReplaceAttr: replaceProdAttributes,
-		})
+		// Development mode - use custom handler for colored output with source
+		consoleHandler = &devHandler{
+			w:     os.Stderr,
+			level: config.LogLevel,
+		}
 	}
 
 	// Create multi-handler
@@ -121,7 +112,19 @@ func getDefaultLogPath(appName string) string {
 	if runtime.GOOS == "windows" {
 		return filepath.Join(os.Getenv("APPDATA"), appName, "logs", appName+".log")
 	}
-	return filepath.Join("/var/log", appName, appName+".log")
+	
+	// Use XDG_STATE_HOME or fallback to ~/.local/state (standard Linux location for logs)
+	stateDir := os.Getenv("XDG_STATE_HOME")
+	if stateDir == "" {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			// Last resort fallback
+			return filepath.Join("/tmp", appName, appName+".log")
+		}
+		stateDir = filepath.Join(homeDir, ".local", "state")
+	}
+	
+	return filepath.Join(stateDir, appName, appName+".log")
 }
 
 func createLogFile(path string) (*os.File, error) {
@@ -244,6 +247,106 @@ func (h *simpleHandler) WithGroup(name string) slog.Handler {
 	return &simpleHandler{handler: h.handler.WithGroup(name)}
 }
 
+// devHandler is a custom handler for development mode with colors and source info
+type devHandler struct {
+	w     io.Writer
+	level slog.Level
+	attrs []slog.Attr
+	group string
+}
+
+func (h *devHandler) Enabled(ctx context.Context, level slog.Level) bool {
+	return level >= h.level
+}
+
+func (h *devHandler) Handle(ctx context.Context, r slog.Record) error {
+	var buf strings.Builder
+
+	// Get color for this log level
+	color := levelColor(r.Level)
+
+	// Add timestamp
+	buf.WriteString(colorize(color, r.Time.Format("15:04:05.000")))
+	buf.WriteString(colorize(color, " | "))
+
+	// Add source information if available
+	if r.PC != 0 {
+		fs := runtime.CallersFrames([]uintptr{r.PC})
+		f, _ := fs.Next()
+		if f.File != "" {
+			// Show relative path and line number
+			file := filepath.Base(f.File)
+			source := fmt.Sprintf("%s:%d", file, f.Line)
+			buf.WriteString(colorize(color, source))
+			buf.WriteString(colorize(color, " | "))
+		}
+	}
+
+	// Add level
+	buf.WriteString(colorize(color, r.Level.String()))
+	buf.WriteString(colorize(color, " | "))
+
+	// Add message
+	buf.WriteString(colorize(color, r.Message))
+
+	// Collect attributes from handler and record
+	attrs := make([]string, 0, len(h.attrs)+r.NumAttrs())
+	
+	// Add handler-level attributes first
+	for _, attr := range h.attrs {
+		if attr.Key != "" {
+			attrs = append(attrs, formatAttr(attr))
+		}
+	}
+	
+	// Add record-level attributes
+	r.Attrs(func(attr slog.Attr) bool {
+		if attr.Key != "" {
+			attrs = append(attrs, formatAttr(attr))
+		}
+		return true
+	})
+
+	// Add attributes if any
+	if len(attrs) > 0 {
+		buf.WriteString(" [")
+		for i, attr := range attrs {
+			if i > 0 {
+				buf.WriteString(", ")
+			}
+			buf.WriteString(colorize(colorCyan, attr))
+		}
+		buf.WriteString("]")
+	}
+
+	buf.WriteString("\n")
+
+	_, err := h.w.Write([]byte(buf.String()))
+	return err
+}
+
+func (h *devHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	newAttrs := make([]slog.Attr, len(h.attrs)+len(attrs))
+	copy(newAttrs, h.attrs)
+	copy(newAttrs[len(h.attrs):], attrs)
+	
+	return &devHandler{
+		w:     h.w,
+		level: h.level,
+		attrs: newAttrs,
+		group: h.group,
+	}
+}
+
+func (h *devHandler) WithGroup(name string) slog.Handler {
+	return &devHandler{
+		w:     h.w,
+		level: h.level,
+		attrs: h.attrs,
+		group: name,
+	}
+}
+
 // MultiHandler handles logging to multiple destinations
 type multiHandler struct {
 	handlers []slog.Handler
@@ -287,43 +390,4 @@ func (h *multiHandler) WithGroup(name string) slog.Handler {
 		handlers[i] = handler.WithGroup(name)
 	}
 	return newMultiHandler(handlers...)
-}
-
-// Attribute replacement functions
-func replaceDevAttributes(groups []string, a slog.Attr) slog.Attr {
-	if a.Key == slog.LevelKey {
-		level := a.Value.Any().(slog.Level)
-		levelString := level.String()
-
-		color := levelColor(level)
-		coloredLevel := colorize(color, levelString)
-
-		return slog.Attr{
-			Key:   a.Key,
-			Value: slog.StringValue(coloredLevel),
-		}
-	}
-
-	if a.Key == slog.TimeKey && len(groups) == 0 {
-		if t, ok := a.Value.Any().(time.Time); ok {
-			return slog.Attr{
-				Key:   a.Key,
-				Value: slog.StringValue(t.Format("15:04:05.000")),
-			}
-		}
-	}
-
-	return a
-}
-
-func replaceProdAttributes(groups []string, a slog.Attr) slog.Attr {
-	if a.Key == slog.TimeKey && len(groups) == 0 {
-		if t, ok := a.Value.Any().(time.Time); ok {
-			return slog.Attr{
-				Key:   a.Key,
-				Value: slog.StringValue(t.Format(time.RFC3339)),
-			}
-		}
-	}
-	return a
 }

@@ -6,7 +6,6 @@ import (
 
 	"log/slog"
 
-	"github.com/UnivocalX/aether/internal/logging"
 	"github.com/gin-gonic/gin"
 )
 
@@ -58,13 +57,7 @@ func (w *slogWriter) Write(p []byte) (int, error) {
 }
 
 // logging middle ware logs HTTP requests using slog.LogAttrs which respects default handler
-func Logger(cfg *logging.Config) gin.HandlerFunc {
-	logger, err := logging.NewService(cfg)
-	if err != nil {
-		slog.Error("Failed to setup service logging", "error", err)
-	}
-	slog.SetDefault(logger)
-
+func Logger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Common attrs (no request_id for now)
 		common := []slog.Attr{

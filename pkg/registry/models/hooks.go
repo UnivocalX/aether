@@ -1,14 +1,13 @@
 package models
 
 import (
-	"errors"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
 
-	"encoding/json"
 	"gorm.io/gorm"
 )
 
@@ -26,9 +25,9 @@ type Status string
 
 const (
 	StatusRejected Status = "rejected"
-	StatusPending Status = "pending"
-	StatusReady   Status = "ready"
-	StatusDeleted Status = "deleted"
+	StatusPending  Status = "pending"
+	StatusReady    Status = "ready"
+	StatusDeleted  Status = "deleted"
 )
 
 // IsValid checks if the status is a valid AssetStatus
@@ -96,17 +95,12 @@ func (a *Asset) BeforeSave(tx *gorm.DB) error {
 }
 
 func (a *Asset) BeforeUpdate(tx *gorm.DB) error {
-	if len(a.Metadata) == 0 {
-		return fmt.Errorf("%w: metadata is required", ErrValidation)
+	if a.MimeType == "" {
+		return fmt.Errorf("%w: asset MimeType cannot be empty", ErrValidation)
 	}
-
-	var meta AssetMetadata
-	if err := json.Unmarshal(a.Metadata, &meta); err != nil {
-		return fmt.Errorf("invalid metadata format: %w", err)
-	}
-
-	if err := meta.Validate(); err != nil {
-		return fmt.Errorf("metadata validation failed: %w", err)
+	
+	if a.SizeBytes <= 0 {
+		return fmt.Errorf("%w: asset SizeBytes must be positive", ErrValidation)
 	}
 
 	return nil

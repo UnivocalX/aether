@@ -2,6 +2,7 @@ package registry
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/UnivocalX/aether/pkg/registry/models"
 
+	"gorm.io/datatypes"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -38,7 +40,7 @@ func New(cfg *Config) (*Engine, error) {
 		"storageEndpoint", cfg.Storage.S3Endpoint,
 		"storageBucket", cfg.Storage.Bucket,
 		"storagePrefix", cfg.Storage.Prefix,
-		"datastore", fmt.Sprintf("%s:%d", cfg.Datastore.Endpoint.GetHost(), cfg.Datastore.Endpoint.GetPort()),
+		"database", fmt.Sprintf("%s:%d", cfg.Database.Endpoint.GetHost(), cfg.Database.Endpoint.GetPort()),
 	)
 
 	if err := cfg.Normalize(); err != nil {
@@ -69,12 +71,16 @@ func New(cfg *Config) (*Engine, error) {
 	preClient := s3.NewPresignClient(s3Client)
 
 	// DB Client
-	dsn := cfg.Datastore.DSN()
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	dsn := cfg.Database.DSN()
+	slog.Debug("Database connection details",
+		"dsn", dsn, // Automatically redacted in logs
+	)
+
+	db, err := gorm.Open(postgres.Open(dsn.Value()), &gorm.Config{})
 	if err != nil {
 		return nil, err
 	}
-
+	
 	// Create engine
 	engine := &Engine{
 		Config: cfg,
@@ -163,12 +169,25 @@ func (engine *Engine) GetURLExpire(ctx context.Context, sha256 string, expire ti
 	return res.URL, nil
 }
 
-func (engine *Engine) CreateAssetRecord(ctx context.Context, sha256 string, display string) (*models.Asset, error) {
+func (engine *Engine) CreateAssetRecord(
+	ctx context.Context,
+	sha256 string,
+	display string,
+	extra map[string]interface{},
+) (*models.Asset, error) {
 	slog.Debug("Creating asset", "display", display, "checksum", sha256)
 
 	asset := &models.Asset{
 		Checksum: sha256,
 		Display:  display,
+	}
+
+	if extra != nil {
+		jsonData, err := json.Marshal(extra)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal extra data: %w", err)
+		}
+		asset.Extra = datatypes.JSON(jsonData)
 	}
 
 	if err := engine.DB.Create(asset).Error; err != nil {
@@ -218,7 +237,7 @@ func (engine *Engine) GetTagRecord(ctx context.Context, name string) (*models.Ta
 	err := engine.DB.Where("name = ?", normalizedName).First(&tag).Error
 
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, ErrAssetNotFound
+		return nil, ErrTagNotFound
 	}
 
 	if err != nil {
@@ -251,4 +270,35 @@ func (engine *Engine) AssociateTagWithAsset(assetID uint, tagID uint) error {
 		return err
 	}
 	return nil
+}
+
+func (engine *Engine) ListTags(ctx context.Context, cursor uint, limit int) ([]*models.Tag, uint, bool, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+
+	fetchLimit := limit + 1
+	var tags []*models.Tag
+
+	query := engine.DB.WithContext(ctx).Limit(fetchLimit)
+
+	if cursor > 0 {
+		query = query.Where("id > ?", cursor)
+	}
+
+	if err := query.Order("id ASC").Find(&tags).Error; err != nil {
+		return nil, 0, false, err
+	}
+
+	hasMore := len(tags) > limit
+	if hasMore {
+		tags = tags[:limit]
+	}
+
+	nextCursor := uint(0)
+	if len(tags) > 0 {
+		nextCursor = tags[len(tags)-1].ID
+	}
+
+	return tags, nextCursor, hasMore, nil
 }

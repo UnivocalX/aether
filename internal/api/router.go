@@ -6,7 +6,7 @@ import (
 	
 	"github.com/gin-gonic/gin"
 
-	"github.com/UnivocalX/aether/internal/api/handlers"
+	"github.com/UnivocalX/aether/internal/api/v1/handlers"
 	"github.com/UnivocalX/aether/internal/api/middleware"
 	"github.com/UnivocalX/aether/internal/logging"
 	"github.com/UnivocalX/aether/pkg/registry"
@@ -27,7 +27,13 @@ func (cfg Config) String() string {
 
 // New returns a router that uses your logging middleware instead of Gin's default logger.
 func New(cfg *Config) (*gin.Engine, error) {
-	slog.Debug("Setting up new API router")
+	logger, err := logging.NewService(cfg.Logging)
+
+	if err != nil {
+		slog.Error("Failed to setup service logging", "error", err)
+	} else {
+		slog.SetDefault(logger)
+	}
 
 	if cfg.Logging.Prod {
 		gin.SetMode(gin.ReleaseMode)
@@ -38,19 +44,24 @@ func New(cfg *Config) (*gin.Engine, error) {
 	if err != nil {
 		return nil, err
 	}
-
+	
+	// Create router
 	router := gin.New()
 	router.Use(gin.Recovery())
-	router.Use(middleware.Logger(cfg.Logging))
+	router.Use(middleware.Logger())
 
 	// API v1 routes
 	v1 := router.Group("v1")
 	v1.GET("/health", handlers.HealthCheck())
 
-	// Data endpoints
+	// Registry endpoints
 	registryHandler := handlers.NewRegistryHandler(engine)
-	v1.POST("/data/:sha256", registryHandler.CreateAsset)
-	v1.POST("/tag/:name", registryHandler.CreateTag)
+	v1.POST("/assets/:sha256", registryHandler.CreateAsset)
+	v1.GET("/assets/:sha256", registryHandler.GetAsset)
+
+	v1.POST("/tags/:name", registryHandler.CreateTag)
+	v1.GET("/tags/:name", registryHandler.GetTag)
+	v1.GET("/tags", registryHandler.ListTags)
 
 	return router, nil
 }

@@ -2,41 +2,85 @@ package registry
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 )
 
-type Endpoint string
 type Secret string
 
+func (s Secret) String() string {
+	return "REDACTED"
+}
+
+// Value returns the actual secret value
+func (s Secret) Value() string {
+	return string(s)
+}
+
+type DSN string
+
+func (d DSN) String() string {
+	// Redact password when converting to string (for logging)
+	s := string(d)
+
+	// Simple regex or string replacement to hide password
+	return strings.ReplaceAll(s,
+		regexp.MustCompile(`password=[^ ]*`).FindString(s),
+		"password=REDACTED")
+}
+
+// Value returns the actual DSN for database connection
+func (d DSN) Value() string {
+	return string(d)
+}
+
+type Endpoint string
+
 func (e Endpoint) GetHost() string {
-	parts := strings.Split(string(e), ":")
-	if len(parts) > 0 {
-		return parts[0]
+	endpoint := strings.TrimSpace(string(e))
+	if endpoint == "" {
+		return "localhost" // Default host
 	}
-	return ""
+
+	parts := strings.Split(endpoint, ":")
+	host := strings.TrimSpace(parts[0])
+	if host == "" {
+		return "localhost"
+	}
+	return host
 }
 
 func (e Endpoint) GetPort() int {
-	parts := strings.Split(string(e), ":")
+	endpoint := strings.TrimSpace(string(e))
+	if endpoint == "" {
+		return 5432 // Default PostgreSQL port
+	}
+
+	parts := strings.Split(endpoint, ":")
 	if len(parts) > 1 {
-		port, err := strconv.Atoi(parts[1])
-		if err == nil {
+		portStr := strings.TrimSpace(parts[1])
+		if port, err := strconv.Atoi(portStr); err == nil && port > 0 && port <= 65535 {
 			return port
 		}
 	}
-	return 0
+	return 5432 // Default PostgreSQL port
+}
+
+// Add this method for better debugging
+func (e Endpoint) String() string {
+	return string(e)
 }
 
 // Config is the root configuration for registry
 type Config struct {
-	Storage   StorageCFG   `json:"storage"`
-	Datastore DatastoreCFG `json:"datastore"`
+	Storage  StorageCFG  `json:"storage"`
+	Database DatabaseCFG `json:"database"`
 }
 
-// DatastoreCFG holds SQL datastore configuration
-type DatastoreCFG struct {
+// DatabaseCFG holds SQL database configuration
+type DatabaseCFG struct {
 	Endpoint Endpoint `json:"endpoint"`
 	User     string   `json:"user"`
 	Password Secret   `json:"password"`
@@ -59,7 +103,7 @@ func NewConfig() *Config {
 		Storage: StorageCFG{
 			TTL: 15 * time.Minute,
 		},
-		Datastore: DatastoreCFG{
+		Database: DatabaseCFG{
 			SSL:      false,
 			TimeZone: "UTC",
 		},
@@ -76,8 +120,8 @@ func (cfg *Config) Validate() error {
 		return fmt.Errorf("storage: %w", err)
 	}
 
-	if err := cfg.Datastore.Validate(); err != nil {
-		return fmt.Errorf("datastore: %w", err)
+	if err := cfg.Database.Validate(); err != nil {
+		return fmt.Errorf("database: %w", err)
 	}
 
 	return nil
@@ -88,8 +132,8 @@ func (cfg *Config) Normalize() error {
 	if err := cfg.Storage.Normalize(); err != nil {
 		return fmt.Errorf("storage: %w", err)
 	}
-	if err := cfg.Datastore.Normalize(); err != nil {
-		return fmt.Errorf("datastore: %w", err)
+	if err := cfg.Database.Normalize(); err != nil {
+		return fmt.Errorf("database: %w", err)
 	}
 	return nil
 }
@@ -126,9 +170,9 @@ func (cfg StorageCFG) String() string {
 		cfg.S3Endpoint, cfg.Bucket, cfg.Prefix, cfg.TTL)
 }
 
-// --- DatastoreCFG methods ---
+// --- DatabaseCFG methods ---
 
-func (cfg *DatastoreCFG) Normalize() error {
+func (cfg *DatabaseCFG) Normalize() error {
 	cfg.User = strings.TrimSpace(cfg.User)
 	cfg.Name = strings.TrimSpace(cfg.Name)
 	cfg.TimeZone = strings.TrimSpace(cfg.TimeZone)
@@ -145,7 +189,7 @@ func (cfg *DatastoreCFG) Normalize() error {
 	return nil
 }
 
-func (cfg *DatastoreCFG) Validate() error {
+func (cfg *DatabaseCFG) Validate() error {
 	if cfg.User == "" {
 		return fmt.Errorf("user required")
 	}
@@ -164,48 +208,34 @@ func (cfg *DatastoreCFG) Validate() error {
 	return nil
 }
 
-func (cfg *DatastoreCFG) DSN() string {
+func (cfg *DatabaseCFG) DSN() DSN {
 	sslMode := "disable"
 	if cfg.SSL {
 		sslMode = "require"
 	}
 
-	return fmt.Sprintf(
+	host := cfg.Endpoint.GetHost()
+	
+	dsn := fmt.Sprintf(
 		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s TimeZone=%s",
-		cfg.Endpoint.GetHost(), cfg.Endpoint.GetPort(),
-		cfg.User, cfg.Password, cfg.Name, sslMode, cfg.TimeZone,
+		host, cfg.Endpoint.GetPort(),
+		cfg.User, cfg.Password.Value(), cfg.Name, sslMode, cfg.TimeZone,
 	)
-}
 
-// URL returns the connection URL form (useful for pgx or other drivers)
-func (cfg *DatastoreCFG) URL() string {
-	sslMode := "disable"
-	if cfg.SSL {
-		sslMode = "require"
-	}
-	return fmt.Sprintf(
-		"postgres://%s:%s@%s:%d/%s?sslmode=%s&TimeZone=%s",
-		cfg.User, cfg.Password,
-		cfg.Endpoint.GetHost(), cfg.Endpoint.GetPort(),
-		cfg.Name, sslMode, cfg.TimeZone,
-	)
+	return DSN(dsn)
 }
 
 // String redacts sensitive fields when printing
-func (cfg DatastoreCFG) String() string {
+func (cfg DatabaseCFG) String() string {
 	return fmt.Sprintf(
-		"DatastoreCFG{Endpoint:%s, User:%q, Name:%q, SSL:%t, TimeZone:%q, Password:%q}",
+		"DatabaseCFG{Endpoint:%s, User:%q, Name:%q, SSL:%t, TimeZone:%q, Password:%q}",
 		cfg.Endpoint, cfg.User, cfg.Name, cfg.SSL, cfg.TimeZone, cfg.Password,
 	)
 }
 
 func (cfg Config) String() string {
 	return fmt.Sprintf(
-		"RegistryConfig{Storage:%s, Datastore:%s}",
-		cfg.Storage, cfg.Datastore,
+		"RegistryConfig{Storage:%s, Database:%s}",
+		cfg.Storage, cfg.Database,
 	)
-}
-
-func (s Secret) String() string {
-	return "REDACTED"
 }
