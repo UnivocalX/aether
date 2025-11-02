@@ -73,6 +73,8 @@ func ValidateSHA256(hash string) error {
 // Hooks for Asset
 func (a *Asset) BeforeSave(tx *gorm.DB) error {
 	a.Display = NormalizeName(a.Display)
+	a.Checksum = NormalizeName(a.Checksum)
+
 	if !ValidateName(a.Display) {
 		return fmt.Errorf("%w: asset Display contains invalid characters", ErrValidation)
 	}
@@ -95,6 +97,8 @@ func (a *Asset) BeforeSave(tx *gorm.DB) error {
 }
 
 func (a *Asset) BeforeUpdate(tx *gorm.DB) error {
+	a.MimeType = NormalizeName(a.MimeType)
+
 	if a.MimeType == "" {
 		return fmt.Errorf("%w: asset MimeType cannot be empty", ErrValidation)
 	}

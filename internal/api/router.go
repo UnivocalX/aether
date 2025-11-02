@@ -25,7 +25,6 @@ func (cfg Config) String() string {
     )
 }
 
-// New returns a router that uses your logging middleware instead of Gin's default logger.
 func New(cfg *Config) (*gin.Engine, error) {
 	logger, err := logging.NewService(cfg.Logging)
 
@@ -58,6 +57,7 @@ func New(cfg *Config) (*gin.Engine, error) {
 	registryHandler := handlers.NewRegistryHandler(engine)
 	v1.POST("/assets/:sha256", registryHandler.CreateAsset)
 	v1.GET("/assets/:sha256", registryHandler.GetAsset)
+	v1.GET("/assets", registryHandler.ListAssets)
 
 	v1.POST("/tags/:name", registryHandler.CreateTag)
 	v1.GET("/tags/:name", registryHandler.GetTag)

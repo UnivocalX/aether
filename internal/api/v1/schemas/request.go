@@ -1,5 +1,9 @@
 package schemas
 
+import (
+	"github.com/UnivocalX/aether/pkg/registry/models"
+)
+
 type CreateAssetRequest struct {
 	SHA256  string                 `uri:"sha256" binding:"required,len=64,hexadecimal"`
 	Display string                 `json:"display" binding:"required,min=1,max=500"`
@@ -24,3 +28,6 @@ type ListTagsRequest struct {
 	Limit  int  `form:"limit" binding:"omitempty,min=1,max=100"`
 }
 
+type ListAssetsRequest struct {
+    models.SearchAssetsOptions
+}

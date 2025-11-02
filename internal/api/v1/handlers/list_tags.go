@@ -43,8 +43,10 @@ func (handler *RegistryHandler) listTags(ctx context.Context, req *schemas.ListT
 	}
 
 	return &schemas.ListTagsResponse{
-		Tags:       tags,
-		NextCursor: nextCursor,
-		HasMore:    hasMore,
+		PaginatedResponse: schemas.PaginatedResponse{
+			NextCursor: nextCursor,
+			HasMore:    hasMore,
+		},
+		Tags: tags,
 	}, nil
 }

@@ -80,7 +80,7 @@ func New(cfg *Config) (*Engine, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Create engine
 	engine := &Engine{
 		Config: cfg,
@@ -301,4 +301,95 @@ func (engine *Engine) ListTags(ctx context.Context, cursor uint, limit int) ([]*
 	}
 
 	return tags, nextCursor, hasMore, nil
+}
+
+func (engine *Engine) ListAssets(ctx context.Context, opts *models.SearchAssetsOptions) ([]*models.Asset, uint, bool, error) {
+	// Use the constructor function and validate
+	if opts == nil {
+		defaultOpts := models.NewSearchAssetsOptions()
+		opts = &defaultOpts
+	}
+
+	// Validate and normalize options using the struct methods
+	opts.Normalize()
+	if err := opts.Validate(); err != nil {
+		return nil, 0, false, fmt.Errorf("invalid search options: %w", err)
+	}
+
+	// Build query
+	query := engine.buildSearchAssetQuery(ctx, opts)
+
+	// Preload relationships
+	query = query.Preload("Tags").Preload("Peers").Preload("DatasetVersions")
+
+	// Get total count for the current filters
+	var totalCount int64
+	countQuery := engine.buildSearchAssetQuery(ctx, opts).Model(&models.Asset{})
+	if err := countQuery.Count(&totalCount).Error; err != nil {
+		return nil, 0, false, fmt.Errorf("failed to count assets: %w", err)
+	}
+
+	// Apply pagination (fetch +1 to check for more results)
+	// Convert uint to int for GORM Limit()
+	limit := int(opts.Limit)
+	query = query.Order("id ASC").Limit(limit + 1)
+
+	// Execute query
+	var assets []*models.Asset
+	if err := query.Find(&assets).Error; err != nil {
+		return nil, 0, false, fmt.Errorf("failed to fetch assets: %w", err)
+	}
+
+	// Determine pagination info
+	hasMore := len(assets) > limit
+	if hasMore {
+		assets = assets[:limit] // Remove the extra item
+	}
+
+	nextCursor := uint(0)
+	if len(assets) > 0 {
+		nextCursor = assets[len(assets)-1].ID
+	}
+
+	return assets, nextCursor, hasMore, nil
+}
+
+func (engine *Engine) buildSearchAssetQuery(ctx context.Context, opt *models.SearchAssetsOptions) *gorm.DB {
+	query := engine.DB.WithContext(ctx).Model(&models.Asset{})
+
+	if opt.MimeType != "" {
+		query = query.Where("mime_type = ?", opt.MimeType)
+	}
+
+	if opt.State != "" {
+		query = query.Where("state = ?", opt.State)
+	}
+
+	if opt.Cursor > 0 {
+		query = query.Where("id > ?", opt.Cursor)
+	}
+
+	// Safer included tags handling
+	for _, tag := range opt.IncludedTags {
+		query = query.Where("EXISTS (?)",
+			engine.DB.WithContext(ctx).Select("1").
+				Table("asset_tags").
+				Joins("JOIN tags ON tags.id = asset_tags.tag_id").
+				Where("asset_tags.asset_id = assets.id").
+				Where("tags.name = ?", tag),
+		)
+	}
+
+	// Handle excluded tags
+	if len(opt.ExcludedTags) > 0 {
+		query = query.Where("NOT EXISTS (?)",
+			engine.DB.WithContext(ctx).Select("1").
+				Table("asset_tags").
+				Joins("JOIN tags ON tags.id = asset_tags.tag_id").
+				Where("asset_tags.asset_id = assets.id").
+				Where("tags.name IN ?", opt.ExcludedTags),
+		)
+	}
+
+	return query
 }

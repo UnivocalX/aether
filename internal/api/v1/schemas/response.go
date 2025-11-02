@@ -11,6 +11,11 @@ type Response struct {
 	Meta    *ResponseMetadata `json:"meta,omitempty"`
 }
 
+type PaginatedResponse struct {
+	NextCursor uint `json:"nextCursor"`
+	HasMore    bool `json:"hasMore"`
+}
+
 type ResponseMetadata struct {
 	Timestamp string `json:"timestamp"`
 	RequestID string `json:"request_id,omitempty"`
@@ -37,7 +42,11 @@ type GetAssetResponse struct {
 }
 
 type ListTagsResponse struct {
-	Tags       []*models.Tag `json:"tags"`
-	NextCursor uint          `json:"next_cursor,omitempty"`
-	HasMore    bool          `json:"has_more"`
+	PaginatedResponse
+	Tags []*models.Tag `json:"tags"`
+}
+
+type ListAssetsResponse struct {
+	PaginatedResponse
+	Assets []*models.Asset `json:"assets"`
 }
