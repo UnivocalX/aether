@@ -1,8 +1,4 @@
-/*
-Copyright © 2025 NAME HERE <EMAIL ADDRESS>
-
-*/
-package cmd
+package assets
 
 import (
 	"fmt"
@@ -26,15 +22,5 @@ to quickly create a Cobra application.`,
 }
 
 func init() {
-	assetsCmd.AddCommand(loadCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// loadCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// loadCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	AssetsCmd.AddCommand(loadCmd)
 }
