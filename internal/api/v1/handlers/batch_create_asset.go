@@ -32,21 +32,31 @@ func (handler *RegistryHandler) BatchCreateAsset(ctx *gin.Context) {
 		return
 	}
 
-	// Determine overall status
-	statusCode, message := determineBatchStatus(responses)
+	// Send appropriate response based on batch results
+	handler.sendBatchResponse(ctx, responses)
+}
+
+// sendBatchResponse determines and sends the appropriate HTTP response for batch operations
+func (handler *RegistryHandler) sendBatchResponse(ctx *gin.Context, responses []schemas.BatchCreateAssetResponse) {
+	total := len(responses)
+	successful := countSuccessful(responses)
+	failed := countFailed(responses)
 
 	slog.InfoContext(ctx.Request.Context(), "Batch asset creation completed",
-		"totalAssets", len(req.Assets),
-		"successful", countSuccessful(responses),
-		"failed", countFailed(responses),
+		"totalAssets", total,
+		"successful", successful,
+		"failed", failed,
 	)
 
-	// Use your existing response helper with the appropriate status code
-	ctx.JSON(statusCode, gin.H{
-		"statusCode": statusCode,
-		"msg":        message,
-		"data":       responses,
-	})
+	switch {
+	case failed == 0:
+		Created(ctx, fmt.Sprintf("All %d assets created successfully", total), responses)
+	case successful == 0:
+		BadRequest(ctx, fmt.Sprintf("All %d assets failed to create", total))
+	default:
+		// Partial success
+		MultiStatus(ctx, fmt.Sprintf("Created %d assets, %d failed", successful, failed), responses)
+	}
 }
 
 // createAssets contains the core business logic for batch creation
@@ -146,7 +156,7 @@ func (handler *RegistryHandler) handleNewAssetInBatch(ctx context.Context, asset
 	return &schemas.BatchCreateAssetResponse{
 		CreateAssetResponse: schemas.CreateAssetResponse{
 			SHA256:       assetReq.SHA256,
-			PresignedURL: url.Value(),
+			PresignedURL: url,
 			Expiry:       handler.registry.Config.Storage.TTL.String(),
 			AssetID:      assetID,
 		},
@@ -163,7 +173,7 @@ func (handler *RegistryHandler) buildBatchAssetResponse(ctx context.Context, sha
 	return &schemas.BatchCreateAssetResponse{
 		CreateAssetResponse: schemas.CreateAssetResponse{
 			SHA256:       sha256,
-			PresignedURL: url.Value(),
+			PresignedURL: url,
 			Expiry:       handler.registry.Config.Storage.TTL.String(),
 			AssetID:      assetID,
 		},
@@ -188,28 +198,6 @@ func mergeTags(globalTags, assetTags []uint) []uint {
 	}
 
 	return result
-}
-
-func determineBatchStatus(responses []schemas.BatchCreateAssetResponse) (int, string) {
-	total := len(responses)
-	successful := 0
-	failed := 0
-
-	for _, response := range responses {
-		if response.Error == "" {
-			successful++
-		} else {
-			failed++
-		}
-	}
-
-	if failed == 0 {
-		return 201, fmt.Sprintf("All %d assets created successfully", total)
-	} else if successful == 0 {
-		return 400, fmt.Sprintf("All %d assets failed to create", total)
-	} else {
-		return 207, fmt.Sprintf("Created %d assets, %d failed", successful, failed)
-	}
 }
 
 func countSuccessful(responses []schemas.BatchCreateAssetResponse) int {

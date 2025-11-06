@@ -122,7 +122,7 @@ func (handler *RegistryHandler) handleNewAsset(ctx context.Context, req schemas.
 
 	return &schemas.CreateAssetResponse{
 		SHA256:       req.SHA256,
-		PresignedURL: url.Value(),
+		PresignedURL: url,
 		Expiry:       handler.registry.Config.Storage.TTL.String(),
 		AssetID:      assetID,
 	}, nil
@@ -157,7 +157,7 @@ func (handler *RegistryHandler) buildAssetResponse(ctx context.Context, sha256 s
 
 	return &schemas.CreateAssetResponse{
 		SHA256:       sha256,
-		PresignedURL: url.Value(),
+		PresignedURL: url,
 		Expiry:       handler.registry.Config.Storage.TTL.String(),
 		AssetID:      assetID,
 	}, nil

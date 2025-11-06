@@ -1,6 +1,7 @@
 package schemas
 
 import (
+	"github.com/UnivocalX/aether/pkg/registry"
 	"github.com/UnivocalX/aether/pkg/registry/models"
 )
 
@@ -29,7 +30,7 @@ type BatchCreateAssetResponse struct {
 type CreateAssetResponse struct {
 	AssetID      uint            `json:"asset_id"`
 	SHA256       string          `json:"sha256"`
-	PresignedURL string `json:"presigned_url"`
+	PresignedURL registry.Secret `json:"presigned_url"`
 	Expiry       string          `json:"expiry"`
 }
 

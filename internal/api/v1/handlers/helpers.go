@@ -25,9 +25,31 @@ func Created(c *gin.Context, message string, data interface{}) {
 	})
 }
 
+func MultiStatus(c *gin.Context, message string, data interface{}) {
+	c.JSON(207, schemas.Response{
+		Message: message,
+		Data:    data,
+		Meta:    buildMeta(c),
+	})
+}
+
 // Error responses - Use HTTP status codes instead of success field
 func BadRequest(c *gin.Context, message string) {
 	c.JSON(400, schemas.Response{
+		Message: message,
+		Meta:    buildMeta(c),
+	})
+}
+
+func Unauthorized(c *gin.Context, message string) {
+	c.JSON(401, schemas.Response{
+		Message: message,
+		Meta:    buildMeta(c),
+	})
+}
+
+func Forbidden(c *gin.Context, message string) {
+	c.JSON(403, schemas.Response{
 		Message: message,
 		Meta:    buildMeta(c),
 	})
