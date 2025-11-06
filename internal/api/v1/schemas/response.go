@@ -21,11 +21,16 @@ type ResponseMetadata struct {
 	RequestID string `json:"request_id,omitempty"`
 }
 
+type BatchCreateAssetResponse struct {
+	CreateAssetResponse
+	Error string `json:"error,omitempty"`
+}
+
 type CreateAssetResponse struct {
-	AssetID      uint   `json:"asset_id"`
-	SHA256       string `json:"sha256"`
+	AssetID      uint            `json:"asset_id"`
+	SHA256       string          `json:"sha256"`
 	PresignedURL string `json:"presigned_url"`
-	Expiry       string `json:"expiry"`
+	Expiry       string          `json:"expiry"`
 }
 
 type CreateTagResponse struct {

@@ -55,6 +55,7 @@ func New(cfg *Config) (*gin.Engine, error) {
 
 	// Registry endpoints
 	registryHandler := handlers.NewRegistryHandler(engine)
+	v1.POST("/assets", registryHandler.BatchCreateAsset)
 	v1.POST("/assets/:sha256", registryHandler.CreateAsset)
 	v1.GET("/assets/:sha256", registryHandler.GetAsset)
 	v1.GET("/assets", registryHandler.ListAssets)

@@ -119,12 +119,12 @@ func (engine *Engine) CuratedKey(sha256 string) string {
 }
 
 // PutURL generates a presigned URL for upload (default expiry)
-func (engine *Engine) PutURL(ctx context.Context, sha256 string) (string, error) {
+func (engine *Engine) PutURL(ctx context.Context, sha256 string) (Secret, error) {
 	return engine.PutURLExpire(ctx, sha256, engine.Config.Storage.TTL)
 }
 
 // PutURLExpire generates a presigned URL with custom expiry and checksum validation
-func (engine *Engine) PutURLExpire(ctx context.Context, sha256 string, expire time.Duration) (string, error) {
+func (engine *Engine) PutURLExpire(ctx context.Context, sha256 string, expire time.Duration) (Secret, error) {
 	input := &s3.PutObjectInput{
 		Bucket:            aws.String(engine.Config.Storage.Bucket),
 		Key:               aws.String(engine.IngressKey(sha256)),
@@ -143,16 +143,16 @@ func (engine *Engine) PutURLExpire(ctx context.Context, sha256 string, expire ti
 	slog.Debug("Generated PUT URL with checksum validation",
 		"sha256", sha256,
 		"expire", expire)
-	return res.URL, nil
+	return Secret(res.URL), nil
 }
 
 // GetURL generates a presigned URL for download (default expiry)
-func (engine *Engine) GetURL(ctx context.Context, sha256 string) (string, error) {
+func (engine *Engine) GetURL(ctx context.Context, sha256 string) (Secret, error) {
 	return engine.GetURLExpire(ctx, sha256, engine.Config.Storage.TTL)
 }
 
 // GetURLExpire generates a presigned URL for download with custom expiry
-func (engine *Engine) GetURLExpire(ctx context.Context, sha256 string, expire time.Duration) (string, error) {
+func (engine *Engine) GetURLExpire(ctx context.Context, sha256 string, expire time.Duration) (Secret, error) {
 	input := &s3.GetObjectInput{
 		Bucket: aws.String(engine.Config.Storage.Bucket),
 		Key:    aws.String(engine.CuratedKey(sha256)),
@@ -166,7 +166,7 @@ func (engine *Engine) GetURLExpire(ctx context.Context, sha256 string, expire ti
 	}
 
 	slog.Debug("Generated GET URL", "sha256", sha256, "expire", expire)
-	return res.URL, nil
+	return Secret(res.URL), nil
 }
 
 func (engine *Engine) CreateAssetRecord(

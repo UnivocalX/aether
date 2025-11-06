@@ -4,6 +4,11 @@ import (
 	"github.com/UnivocalX/aether/pkg/registry/models"
 )
 
+type BatchCreateAssetRequest struct {
+	Assets []CreateAssetRequest `json:"assets" binding:"required,min=1,max=900"`
+	Tags   []uint               `json:"tags" binding:"omitempty,dive,gt=0"` // Global tags for all assets
+}
+
 type CreateAssetRequest struct {
 	SHA256  string                 `uri:"sha256" binding:"required,len=64,hexadecimal"`
 	Display string                 `json:"display" binding:"required,min=1,max=500"`
@@ -29,5 +34,5 @@ type ListTagsRequest struct {
 }
 
 type ListAssetsRequest struct {
-    models.SearchAssetsOptions
+	models.SearchAssetsOptions
 }
