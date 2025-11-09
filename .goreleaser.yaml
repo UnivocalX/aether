@@ -16,18 +16,23 @@ before:
     - go generate ./...
 
 builds:
-  - env:
+  - id: aether-cli
+    main: ./cmd/cli
+    binary: aether
+    env:
       - CGO_ENABLED=0
     goos:
       - linux
       - windows
       - darwin
+    goarch:
+      - amd64
+      - arm64
     ldflags:
       - -s -w
       - -X github.com/UnivocalX/aether/cmd.version={{.Version}}
       - -X github.com/UnivocalX/aether/cmd.commit={{.Commit}}
       - -X github.com/UnivocalX/aether/cmd.date={{.Date}}
-
 
 archives:
   - formats: [tar.gz]

@@ -41,7 +41,7 @@ func init() {
 	bindServeFlags()
 }
 
-func LoadAPIConfig() api.Config {
+func GetAPIConfig() api.Config {
 	registryCFG := registry.NewConfig()
 
 	// Storage - using nested keys
@@ -68,7 +68,7 @@ func LoadAPIConfig() api.Config {
 }
 
 func startServer(cmd *cobra.Command, args []string) error {
-	cfg := LoadAPIConfig()
+	cfg := GetAPIConfig()
 	slog.Info("Starting server...")
 
 	// Create API
