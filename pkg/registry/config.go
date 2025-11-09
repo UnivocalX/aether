@@ -8,6 +8,16 @@ import (
 	"time"
 )
 
+type Secret string
+
+func (s Secret) String() string {
+	return "REDACTED"
+}
+
+// Value returns the actual secret value
+func (s Secret) Value() string {
+	return string(s)
+}
  
 type DSN string
 
