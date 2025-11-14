@@ -1,5 +1,5 @@
 package actions
 
-type Executer interface {
-	Execute() error
+type Runner interface {
+	Run() error
 }

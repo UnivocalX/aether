@@ -17,8 +17,6 @@ var serveCmd = &cobra.Command{
 	Use:           "serve",
 	Short:         "Starts the aether api server",
 	RunE:          startServer,
-	SilenceUsage:  true,
-	SilenceErrors: true,
 }
 
 func init() {
@@ -74,12 +72,12 @@ func startServer(cmd *cobra.Command, args []string) error {
 	// Create API
 	router, err := api.New(&cfg)
 	if err != nil {
-		return fmt.Errorf("failed to start server")
+		return fmt.Errorf("failed to start server, %w", err)
 	}
 
 	// Run Server
 	if err := router.Run(":" + cfg.Port); err != nil {
-		slog.Error("failed to run server.")
+		slog.Error(err.Error())
 		return err
 	}
 

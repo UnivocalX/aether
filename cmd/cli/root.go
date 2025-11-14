@@ -25,7 +25,6 @@ func Execute() {
 	err := rootCmd.Execute()
 
 	if err != nil {
-		slog.Error(err.Error())
 		os.Exit(1)
 	}
 }

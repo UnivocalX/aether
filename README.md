@@ -11,11 +11,18 @@ Ensure storage optimization by avoiding duplicates and applying intelligent stru
 Aether simplifies data governance by combining automation, scalability, and intelligent metadata handling—making it ideal for teams managing large-scale, unstructured data.
 
 ## Build
+
+### Simple
+`go build -o bin/aether ./cmd/cli`
+
+### GoReleaser
+
 ```bash
     goreleaser build --clean
 ```
 
 Single platform
+
 ```bash
     export GOOS="linux"
     export GOARCH="amd64"

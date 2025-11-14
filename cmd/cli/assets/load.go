@@ -14,7 +14,7 @@ var loadCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return actions.NewLoadAssets(viper.GetString("endpoint")).Execute(args[0])
+		return actions.NewLoadAssets(viper.GetString("endpoint")).Run(args[0])
 	},
 }
 

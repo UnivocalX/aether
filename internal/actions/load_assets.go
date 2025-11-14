@@ -3,7 +3,7 @@ package actions
 import (
 	"log/slog"
 
-	"github.com/UnivocalX/aether/pkg/registry"	
+	"github.com/UnivocalX/aether/pkg/registry"
 )
 
 type LoadAssets struct {
@@ -16,7 +16,7 @@ func NewLoadAssets(endpoint string) *LoadAssets {
 	}
 }
 
-func (action *LoadAssets) Execute(source string) error {
+func (action *LoadAssets) Run(source string) error {
 	slog.Debug("executing load assets.",
 		"AetherAPI", action.endpoint,
 		"AssetsSource", source,
