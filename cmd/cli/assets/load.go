@@ -3,6 +3,7 @@ package assets
 import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"context"
 
 	"github.com/UnivocalX/aether/internal/actions"
 )
@@ -14,9 +15,10 @@ var loadCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return actions.NewLoadAssets(viper.GetString("endpoint")).Run(args[0])
+		return actions.NewLoadAssets(context.TODO(), viper.GetString("endpoint")).Run(args[0])
 	},
 }
+
 
 func init() {
 	AssetsCmd.AddCommand(loadCmd)

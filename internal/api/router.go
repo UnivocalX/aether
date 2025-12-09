@@ -49,6 +49,9 @@ func New(cfg *Config) (*gin.Engine, error) {
 	router.Use(gin.Recovery())
 	router.Use(middleware.Logger())
 
+	// Base routes
+	router.GET("/health", handlers.HealthCheck())
+
 	// API v1 routes
 	v1 := router.Group("v1")
 	v1.GET("/health", handlers.HealthCheck())

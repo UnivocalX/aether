@@ -8,7 +8,62 @@ import (
 	"io"
 	"os"
 	"strings"
+
+	"sync"
 )
+
+func ParallelProcess[T any, R any](
+	items []T,
+	numWorkers int,
+	workerFunc func(T) (R, error),
+) ([]R, []error) {
+	if len(items) == 0 {
+		return []R{}, []error{}
+	}
+
+	if numWorkers <= 0 {
+		numWorkers = 1
+	}
+	if numWorkers > len(items) {
+		numWorkers = len(items)
+	}
+
+	var (
+		wg       sync.WaitGroup
+		muResults sync.Mutex
+		muErrors   sync.Mutex
+		results   []R
+		errors    []error
+	)
+
+	workCh := make(chan T, len(items))
+	for _, item := range items {
+		workCh <- item
+	}
+	close(workCh)
+
+	wg.Add(numWorkers)
+	for i := 0; i < numWorkers; i++ {
+		go func() {
+			defer wg.Done()
+			for item := range workCh {
+				result, err := workerFunc(item)
+				if err != nil {
+					muErrors.Lock()
+					errors = append(errors, err)
+					muErrors.Unlock()
+				} else {
+					muResults.Lock()
+					results = append(results, result)
+					muResults.Unlock()
+				}
+			}
+		}()
+	}
+
+	wg.Wait()
+	return results, errors
+}
 
 func CalculateSHA256(filePath string) (string, error) {
 	file, err := os.Open(filePath)
