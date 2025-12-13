@@ -11,6 +11,7 @@
 # Test binary, built with `go build -o`
 aether
 bin/*
+data/*
 
 # Test binary, built with `go test -c`
 *.test
