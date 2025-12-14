@@ -1,0 +1,62 @@
+.
+├── bin
+│   └── aether
+├── cmd
+│   └── cli
+│       ├── assets
+│       │   ├── asset.go
+│       │   └── load.go
+│       ├── main.go
+│       ├── root.go
+│       ├── serve.go
+│       └── version.go
+├── compose.yaml
+├── go.mod
+├── go.sum
+├── internal
+│   ├── actions
+│   │   ├── action.go
+│   │   ├── connector.go
+│   │   └── loadassets.go
+│   ├── api
+│   │   ├── middleware
+│   │   │   └── logger.go
+│   │   ├── router.go
+│   │   └── v1
+│   │       ├── handlers
+│   │       │   ├── batch_create_asset.go
+│   │       │   ├── create_asset.go
+│   │       │   ├── create_tag.go
+│   │       │   ├── get_asset.go
+│   │       │   ├── get_tag.go
+│   │       │   ├── health.go
+│   │       │   ├── helpers.go
+│   │       │   ├── list_assets.go
+│   │       │   └── list_tags.go
+│   │       └── schemas
+│   │           ├── request.go
+│   │           └── response.go
+│   ├── logging
+│   │   └── logging.go
+│   ├── settings
+│   │   └── settings.go
+│   └── utils
+│       ├── helpers.go
+│       └── progress.go
+├── LICENSE
+├── misc
+├── pkg
+│   └── registry
+│       ├── client.go
+│       ├── config.go
+│       └── models
+│           ├── hooks.go
+│           ├── opts.go
+│           └── records.go
+├── README.md
+├── scripts
+│   ├── bump_version.sh
+│   └── create_files.sh
+└── tree
+
+19 directories, 40 files

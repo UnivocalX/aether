@@ -14,9 +14,11 @@ import (
 
 // serveCmd represents the serve command
 var serveCmd = &cobra.Command{
-	Use:           "serve",
-	Short:         "Starts the aether api server",
-	RunE:          startServer,
+	Use:          "serve",
+	Short:        "Starts the aether api server",
+	SilenceUsage: true,
+	SilenceErrors: true,
+	RunE:         startServer,
 }
 
 func init() {
@@ -56,29 +58,29 @@ func GetAPIConfig() api.Config {
 
 	return api.Config{
 		Registry: registryCFG,
-		Logging: &logging.Config{
-			Prod:     viper.GetBool("server.production"),
-			AppName:  "aether",
-			LogLevel: logging.LevelFromString(viper.GetString("level")),
-		},
-		Port: viper.GetString("server.port"),
+		Prod:     viper.GetBool("server.production"),
+		Port:     viper.GetString("server.port"),
 	}
 }
 
 func startServer(cmd *cobra.Command, args []string) error {
 	cfg := GetAPIConfig()
+
+	Logging.SetMode(logging.ServerMode)
+	Logging.SetColoredJSON(!cfg.Prod)
+	Logging.Apply()
+
 	slog.Info("Starting server...")
 
 	// Create API
-	router, err := api.New(&cfg)
+	api, err := api.New(&cfg)
 	if err != nil {
-		return fmt.Errorf("failed to start server, %w", err)
+		return fmt.Errorf("failed to initialize API, %w", err)
 	}
 
-	// Run Server
-	if err := router.Run(":" + cfg.Port); err != nil {
-		slog.Error(err.Error())
-		return err
+	// Run API
+	if err := api.Run(":" + cfg.Port); err != nil {
+		return fmt.Errorf("failed to start API, %w", err)
 	}
 
 	return nil

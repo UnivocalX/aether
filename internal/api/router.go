@@ -1,40 +1,21 @@
 package api
 
 import (
-	"log/slog"
-	"fmt"
-	
 	"github.com/gin-gonic/gin"
 
-	"github.com/UnivocalX/aether/internal/api/v1/handlers"
 	"github.com/UnivocalX/aether/internal/api/middleware"
-	"github.com/UnivocalX/aether/internal/logging"
+	"github.com/UnivocalX/aether/internal/api/v1/handlers"
 	"github.com/UnivocalX/aether/pkg/registry"
 )
 
 type Config struct {
 	Registry *registry.Config
-	Logging  *logging.Config
 	Port     string
-}
-
-func (cfg Config) String() string {
-    return fmt.Sprintf(
-        "Config{Registry:%v, Logging:%v, Port:%q}",
-        cfg.Registry, cfg.Logging, cfg.Port,
-    )
+	Prod     bool
 }
 
 func New(cfg *Config) (*gin.Engine, error) {
-	logger, err := logging.NewService(cfg.Logging)
-
-	if err != nil {
-		slog.Error("Failed to setup service logging", "error", err)
-	} else {
-		slog.SetDefault(logger)
-	}
-
-	if cfg.Logging.Prod {
+	if cfg.Prod {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
@@ -43,7 +24,7 @@ func New(cfg *Config) (*gin.Engine, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Create router
 	router := gin.New()
 	router.Use(gin.Recovery())
