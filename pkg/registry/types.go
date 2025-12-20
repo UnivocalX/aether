@@ -203,15 +203,3 @@ func (p *PresignUrl) String() string {
 		p.ExpiresIn,
 	)
 }
-
-type AssetExistsError struct {
-	Checksum string
-}
-
-func (e *AssetExistsError) Error() string {
-	return fmt.Sprintf("asset with checksum %s already exists", e.Checksum)
-}
-
-func (e *AssetExistsError) Is(target error) bool {
-	return target == ErrAssetAlreadyExists
-}

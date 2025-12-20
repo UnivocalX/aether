@@ -54,6 +54,12 @@ func New(prod bool, engine *registry.Engine) *Server {
 	}
 
 	// Register Routes
-	v1.RegisterRoutes(server.Router, server.DataSvc)
+	server.RegisterRoutes()
 	return server
+}
+
+func (s *Server) RegisterRoutes() {
+	slog.Debug("Registering API routes")
+	api := s.Router.Group("/api")
+	v1.RegisterRoutes(api, s.DataSvc)
 }

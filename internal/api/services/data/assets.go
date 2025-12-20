@@ -7,6 +7,7 @@ import (
 	"log/slog"
 
 	"github.com/UnivocalX/aether/pkg/registry"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 type CreateAssetParams struct {
@@ -48,12 +49,20 @@ func (s *Service) CreateAsset(
 		return nil // commit
 	})
 
+	// handle errors
 	if err != nil {
-		// Handle asset already exists case
-		if errors.Is(err, registry.ErrAssetAlreadyExists) {
-			return s.handleExistingAsset(ctx, params.SHA256)
+		slog.Debug("Create asset transaction failed", "sha256", params.SHA256, "error", err.Error())
+
+		// Check PostgreSQL-specific error code
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			slog.Error("asset already exist", "sha256", params.SHA256)
+			result.Err = fmt.Errorf("%w: %s", ErrAssetAlreadyExists, params.SHA256)
+			return result
 		}
-		result.Err = fmt.Errorf("failed creating new asset: %w", err)
+
+		slog.Debug("unexpected error occurred", "error", err)
+		result.Err = err
 		return result
 	}
 
@@ -86,19 +95,4 @@ func (s *Service) handleCreateAssetTags(ctx context.Context, asset *registry.Ass
 	}
 
 	return nil
-}
-
-func (s *Service) handleExistingAsset(ctx context.Context, checksum string) *CreateAssetResult {
-	result := &CreateAssetResult{}
-	
-	// Fetch the existing asset
-	asset, err := s.registry.GetAssetRecord(ctx, checksum)
-	if err != nil {
-		result.Err = fmt.Errorf("failed getting existing asset: %w", err)
-		return result
-	}
-	
-	result.Asset = asset
-	result.Err = registry.ErrAssetAlreadyExists
-	return result
 }

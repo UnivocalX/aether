@@ -2,7 +2,6 @@ package registry
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"path"
@@ -12,7 +11,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
-	"github.com/jackc/pgx/v5/pgconn"
 
 	slogGorm "github.com/orandin/slog-gorm"
 	"gorm.io/driver/postgres"
@@ -24,13 +22,6 @@ const (
 	DEFAULT_PRESIGN_TTL   = 15 * time.Minute
 	DEFAULT_TIME_ZONE     = "UTC"
 	DEFAULT_DATABASE      = "localhost:5432"
-)
-
-// Define sentinel errors
-var (
-	ErrAssetNotFound = errors.New("asset not found")
-	ErrTagNotFound   = errors.New("tag not found")
-	ErrAssetAlreadyExists = errors.New("asset already exists")
 )
 
 type Engine struct {
@@ -281,11 +272,7 @@ func (engine *Engine) CreateAssetRecord(
 	}
 
 	if err := engine.db(ctx).Create(asset).Error; err != nil {
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23505" { // unique_violation
-			return nil, &AssetExistsError{Checksum: sha256}
-		}
-		return nil, fmt.Errorf("failed to create asset: %w", err)
+		return nil, err
 	}
 
 	return asset, nil

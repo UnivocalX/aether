@@ -103,10 +103,10 @@ func handleCreateAssetError(ctx *gin.Context, err error, sha256 string) {
 	case errors.Is(err, registry.ErrValidation):
 		dto.BadRequest(ctx, err.Error())
 
-	case errors.Is(err, registry.ErrTagNotFound):
+	case errors.Is(err, data.ErrTagNotFound):
 		dto.NotFound(ctx, "One or more tags not found")
 
-	case errors.Is(err, registry.ErrAssetAlreadyExists):
+	case errors.Is(err, data.ErrAssetAlreadyExists):
 		dto.Conflict(ctx, fmt.Sprintf("Asset %s already exists.", sha256))
 
 	default:
