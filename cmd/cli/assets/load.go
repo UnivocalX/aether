@@ -9,10 +9,10 @@ import (
 
 // loadCmd represents the load command
 var loadCmd = &cobra.Command{
-	Use:   "load <path> [paths...]",
-	Short: "Load files as assets to aether data platform.",
-	Long:  "Load files as assets to aether data platform.",
-	Example: "aether assets load data/ --tags archive",
+	Use:           "load <path> [paths...]",
+	Short:         "Load files as assets to aether data platform.",
+	Long:          "Load files as assets to aether data platform.",
+	Example:       "aether assets load data/ --tags archive",
 	Args:          cobra.MinimumNArgs(1),
 	SilenceUsage:  true,
 	SilenceErrors: true,

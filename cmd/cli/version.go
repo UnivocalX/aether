@@ -3,8 +3,9 @@ package main
 import (
 	"runtime"
 
-	"github.com/spf13/cobra"
 	"log/slog"
+
+	"github.com/spf13/cobra"
 )
 
 var (
@@ -32,12 +33,12 @@ func GetBuildInfo() BuildInfo {
 		GoVersion:  runtime.Version(),
 	}
 
-	slog.Info("Aether", 
+	slog.Info("Aether",
 		slog.String("Version", build.Version),
-		slog.String("Commit", build.Commit), 
-		slog.String("Build Date", build.Date), 
-		slog.String("Target OS", build.TargetOS), 
-		slog.String("Target Architecture", build.TargetArch), 
+		slog.String("Commit", build.Commit),
+		slog.String("Build Date", build.Date),
+		slog.String("Target OS", build.TargetOS),
+		slog.String("Target Architecture", build.TargetArch),
 		slog.String("Go", build.GoVersion),
 	)
 	return build

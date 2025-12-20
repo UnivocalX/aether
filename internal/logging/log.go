@@ -15,9 +15,9 @@ const (
 )
 
 type Logging struct {
-	mode        Mode
-	level       slog.Level
-	coloredJSON bool
+	mode    Mode
+	level   slog.Level
+	colored bool
 }
 
 type LoggingOption func(*Logging)
@@ -28,7 +28,7 @@ func (l *Logging) Apply() {
 	case CLIMode:
 		handler = NewCliHandler(l.level)
 	case ServerMode:
-		handler = NewJSONHandler(l.level, l.coloredJSON)
+		handler = NewJSONHandler(l.level, l.colored)
 	default:
 		handler = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: l.level})
 	}
@@ -45,15 +45,15 @@ func (l *Logging) SetLevel(level string) {
 	l.level = parseLogLevel(level)
 }
 
-func (l *Logging) SetColoredJSON(enabled bool) {
-	l.coloredJSON = enabled
+func (l *Logging) EnableColor() {
+	l.colored = true
 }
 
 func NewLogging(opts ...LoggingOption) *Logging {
 	l := &Logging{
-		mode:        BaseMode,
-		level:       slog.LevelInfo,
-		coloredJSON: false,
+		mode:    BaseMode,
+		level:   slog.LevelInfo,
+		colored: false,
 	}
 
 	for _, opt := range opts {
@@ -74,13 +74,6 @@ func WithMode(mode Mode) LoggingOption {
 func WithLevelString(levelStr string) LoggingOption {
 	return func(l *Logging) {
 		l.level = parseLogLevel(levelStr)
-	}
-}
-
-// WithColoredJSON enables colored JSON output in server mode
-func WithColoredJSON(enabled bool) LoggingOption {
-	return func(l *Logging) {
-		l.coloredJSON = enabled
 	}
 }
 

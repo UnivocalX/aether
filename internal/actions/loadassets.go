@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/UnivocalX/aether/internal/api/v1/schemas"
+	v1 "github.com/UnivocalX/aether/internal/api/handlers/v1"
 	"github.com/UnivocalX/aether/internal/helpers"
 )
 
@@ -43,18 +43,18 @@ func (load *LoadAssets) Run(patterns []string, tags []string) error {
 	if len(createRequests) <= 0 {
 		return fmt.Errorf("failed to process potential assets")
 	}
-	
+
 	// Resolve tag names to IDs
 	return nil
 }
 
-func (load *LoadAssets) processFiles(files []string) []*schemas.CreateAssetRequest {
+func (load *LoadAssets) processFiles(files []string) []*v1.AssetPostRequest {
 	slog.Info("attempting to process files")
 
 	act := NewAction[string, string]()
 	artifacts := act.Run(load.processFile, files...)
 
-	var requests []*schemas.CreateAssetRequest
+	var requests []*v1.AssetPostRequest
 	for a := range artifacts {
 		sha256, path, err := a.Unwrap()
 
@@ -65,9 +65,13 @@ func (load *LoadAssets) processFiles(files []string) []*schemas.CreateAssetReque
 
 		slog.Debug("adding new request", "path", path, "sha256", sha256)
 		requests = append(
-			requests, &schemas.CreateAssetRequest{
-				Display: filepath.Base(path),
-				SHA256:  sha256,
+			requests, &v1.AssetPostRequest{
+				AssetPostUriParams: v1.AssetPostUriParams{
+					SHA256: sha256,
+				},
+				AssetPostPayload: v1.AssetPostPayload{
+					Display: filepath.Base(path),
+				},
 			},
 		)
 	}
@@ -180,7 +184,7 @@ func (load *LoadAssets) expandPattern(pattern string) ([]string, error) {
 // 		return 0, err
 // 	}
 
-// 	var tagResp schemas.GetTagResponse
+// 	var tagResp v1.GetTagResponse
 // 	if err := json.Unmarshal(body, &tagResp); err != nil {
 // 		return 0, err
 // 	}
@@ -193,6 +197,6 @@ func (load *LoadAssets) expandPattern(pattern string) ([]string, error) {
 // 	return tagResp.Tag.ID, nil
 // }
 
-// func (act *LoadAssets) Requests() <-chan schemas.CreateAssetRequest {
+// func (act *LoadAssets) Requests() <-chan v1.CreateAssetRequest {
 // 	return act.requests
 // }

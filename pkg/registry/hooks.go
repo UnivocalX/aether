@@ -1,4 +1,4 @@
-package models
+package registry
 
 import (
 	"crypto/sha256"
@@ -15,47 +15,21 @@ var (
 	ErrValidation = errors.New("validation error")
 )
 
-type PeerType string
-
-const (
-	DefaultPeerType PeerType = "default"
-)
-
-type Status string
-
-const (
-	StatusRejected Status = "rejected"
-	StatusPending  Status = "pending"
-	StatusReady    Status = "ready"
-	StatusDeleted  Status = "deleted"
-)
-
-// IsValid checks if the status is a valid AssetStatus
-func (s Status) IsValid() bool {
-	switch s {
-	case StatusPending, StatusReady, StatusDeleted:
-		return true
-	}
-	return false
-}
-
-// ValidNamePattern defines allowed characters for names
-var ValidNamePattern = regexp.MustCompile(`^[a-z0-9/.:_-]+$`)
-
-// ValidateName checks if a name matches the allowed pattern
-func ValidateName(name string) bool {
+// ValidateString checks if a name matches the allowed pattern
+func ValidateString(name string) bool {
+	var ValidNamePattern = regexp.MustCompile(`^[a-z0-9/.:_-]+$`)
 	return ValidNamePattern.MatchString(name)
 }
 
-// NormalizeName converts to lowercase and trims spaces
-func NormalizeName(name string) string {
+// NormalizeString converts to lowercase and trims spaces
+func NormalizeString(name string) string {
 	return strings.ToLower(strings.TrimSpace(name))
 }
 
-func GeneratePeerName(id uint, baseName string, peerType PeerType) string {
+func GeneratePeerName(id uint, baseName string, peerType string) string {
 	// Clean the base name for use in the peer name
 	cleanBaseName := strings.ReplaceAll(baseName, " ", "-")
-	cleanBaseName = NormalizeName(cleanBaseName)
+	cleanBaseName = NormalizeString(cleanBaseName)
 	return fmt.Sprintf("%s-%s-%d", cleanBaseName, peerType, id)
 }
 
@@ -71,49 +45,36 @@ func ValidateSHA256(hash string) error {
 }
 
 // Hooks for Asset
-func (a *Asset) BeforeSave(tx *gorm.DB) error {
-	a.Display = NormalizeName(a.Display)
-	a.Checksum = NormalizeName(a.Checksum)
+func (a *Asset) BeforeCreate(tx *gorm.DB) error {
+	a.MimeType = NormalizeString(a.MimeType)
+	a.Checksum = NormalizeString(a.Checksum)
 
-	if !ValidateName(a.Display) {
-		return fmt.Errorf("%w: asset Display contains invalid characters", ErrValidation)
-	}
-
-	// Set default state if empty
-	if a.State == "" {
-		a.State = StatusPending
-	}
-
-	// Validate state
-	if !a.State.IsValid() {
-		return fmt.Errorf("invalid asset state: %s", a.State)
-	}
-
+	// Validate checksum on creation
 	if err := ValidateSHA256(a.Checksum); err != nil {
 		return err
 	}
 
+	// Set initial state
+	a.State = StatusPending
 	return nil
 }
 
 func (a *Asset) BeforeUpdate(tx *gorm.DB) error {
-	a.MimeType = NormalizeName(a.MimeType)
-
-	if a.MimeType == "" {
-		return fmt.Errorf("%w: asset MimeType cannot be empty", ErrValidation)
-	}
-	
-	if a.SizeBytes <= 0 {
-		return fmt.Errorf("%w: asset SizeBytes must be positive", ErrValidation)
+	if a.State == "" {
+		return fmt.Errorf("%w: asset status is required", ErrValidation)
 	}
 
+	// Prevent checksum modification after creation
+	if tx.Statement.Changed("Checksum") {
+		return fmt.Errorf("%w: checksum cannot be modified after creation", ErrValidation)
+	}
 	return nil
 }
 
-// BeforeSave hook to normalize tag name
+// Hooks for tag
 func (t *Tag) BeforeSave(tx *gorm.DB) error {
-	t.Name = NormalizeName(t.Name)
-	if !ValidateName(t.Name) {
+	t.Name = NormalizeString(t.Name)
+	if !ValidateString(t.Name) {
 		return fmt.Errorf("%w: tag name contains invalid characters", ErrValidation)
 	}
 	return nil
@@ -121,8 +82,8 @@ func (t *Tag) BeforeSave(tx *gorm.DB) error {
 
 // BeforeSave hook to normalize dataset name
 func (d *Dataset) BeforeSave(tx *gorm.DB) error {
-	d.Name = NormalizeName(d.Name)
-	if !ValidateName(d.Name) {
+	d.Name = NormalizeString(d.Name)
+	if !ValidateString(d.Name) {
 		return fmt.Errorf("%w: dataset name contains invalid characters", ErrValidation)
 	}
 	return nil
@@ -130,8 +91,8 @@ func (d *Dataset) BeforeSave(tx *gorm.DB) error {
 
 // BeforeSave hook for DatasetVersion name normalization
 func (dv *DatasetVersion) BeforeSave(tx *gorm.DB) error {
-	dv.Display = NormalizeName(dv.Display)
-	if !ValidateName(dv.Display) {
+	dv.Display = NormalizeString(dv.Display)
+	if !ValidateString(dv.Display) {
 		return fmt.Errorf("%w: dataset version name contains invalid characters", ErrValidation)
 	}
 	return nil
@@ -169,13 +130,13 @@ func (d *Dataset) LatestVersion(tx *gorm.DB) (*DatasetVersion, error) {
 func (p *Peer) BeforeCreate(tx *gorm.DB) error {
 	// Set default type if empty
 	if p.Type == "" {
-		p.Type = DefaultPeerType
+		p.Type = "default"
 	}
 
 	// Normalize base name
-	p.Display = NormalizeName(p.Display)
-	if !ValidateName(p.Display) {
-		return fmt.Errorf("%w: peer base name contains invalid characters", ErrValidation)
+	p.Type = NormalizeString(p.Type)
+	if !ValidateString(p.Type) {
+		return fmt.Errorf("%w: peer Type contains invalid characters", ErrValidation)
 	}
 
 	return nil

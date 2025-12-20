@@ -10,7 +10,6 @@ import (
 	"strings"
 )
 
-
 func CalculateSHA256(filePath string) (string, error) {
 	file, err := os.Open(filePath)
 	if err != nil {

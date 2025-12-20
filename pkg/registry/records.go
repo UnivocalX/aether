@@ -1,6 +1,9 @@
-package models
+package registry
 
 import (
+	"encoding/json"
+	"fmt"
+
 	"gorm.io/gorm"
 
 	"gorm.io/datatypes"
@@ -8,15 +11,30 @@ import (
 
 type Asset struct {
 	gorm.Model
+	Checksum string         `gorm:"uniqueIndex;not null;size:64;check:checksum <> ''"`
+	Display  string         `gorm:"size:500"`
+	Extra    datatypes.JSON `gorm:"type:jsonb"`
+
 	MimeType        string
-	SizeBytes       int64			
-	Extra           datatypes.JSON   `gorm:"type:jsonb"`
-	Checksum        string           `gorm:"uniqueIndex;not null;size:64"`
-	Display         string           `gorm:"size:500"`
+	SizeBytes       int64
 	State           Status           `gorm:"type:status;not null;default:'pending'"`
 	Tags            []Tag            `gorm:"many2many:asset_tags;"`
 	DatasetVersions []DatasetVersion `gorm:"many2many:asset_dataset_versions;"`
 	Peers           []Peer           `gorm:"many2many:asset_peers;"`
+}
+
+func (a *Asset) SetExtra(extra map[string]interface{}) error {
+	if extra == nil {
+		return fmt.Errorf("cant set empty extra value")
+	}
+	
+	jsonData, err := json.Marshal(extra)
+	if err != nil {
+		return fmt.Errorf("failed to marshal extra data: %w", err)
+	}
+
+	a.Extra = datatypes.JSON(jsonData)
+    return nil
 }
 
 type Tag struct {
@@ -44,8 +62,8 @@ type DatasetVersion struct {
 
 type Peer struct {
 	gorm.Model
-	Name    string   `gorm:"uniqueIndex;not null;size:200"`
-	Display string   `gorm:"size:200;not null"`
-	Type    PeerType `gorm:"type:peer_type;not null;default:'default'"`
-	Assets  []Asset  `gorm:"many2many:asset_peers;"`
+	Name    string  `gorm:"uniqueIndex;not null;size:200"`
+	Display string  `gorm:"size:200;not null"`
+	Type    string  `gorm:"not null;default:'default'"`
+	Assets  []Asset `gorm:"many2many:asset_peers;"`
 }

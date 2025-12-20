@@ -14,11 +14,11 @@ import (
 
 // serveCmd represents the serve command
 var serveCmd = &cobra.Command{
-	Use:          "serve",
-	Short:        "Starts the aether api server",
-	SilenceUsage: true,
+	Use:           "serve",
+	Short:         "Starts the aether api server",
+	SilenceUsage:  true,
 	SilenceErrors: true,
-	RunE:         startServer,
+	RunE:          startServer,
 }
 
 func init() {
@@ -41,49 +41,68 @@ func init() {
 	bindServeFlags()
 }
 
-func GetAPIConfig() api.Config {
-	registryCFG := registry.NewConfig()
-
-	// Storage - using nested keys
-	registryCFG.Storage.S3Endpoint = viper.GetString("storage.s3endpoint")
-	registryCFG.Storage.Bucket = viper.GetString("storage.bucket")
-	registryCFG.Storage.Prefix = viper.GetString("storage.prefix")
-
-	// Database - using nested keys
-	registryCFG.Database.Endpoint = registry.Endpoint(viper.GetString("database.endpoint"))
-	registryCFG.Database.User = viper.GetString("database.user")
-	registryCFG.Database.Password = registry.Secret(viper.GetString("database.password"))
-	registryCFG.Database.Name = viper.GetString("database.name")
-	registryCFG.Database.SSL = viper.GetBool("database.ssl")
-
-	return api.Config{
-		Registry: registryCFG,
-		Prod:     viper.GetBool("server.production"),
-		Port:     viper.GetString("server.port"),
+func startServer(cmd *cobra.Command, args []string) error {
+	// Setup server logging
+	slog.Debug("changing logging mode to server mode")
+	prod := viper.GetBool("server.production")
+	if err := setupLogging(prod); err != nil {
+		return err
 	}
+
+	// Create Core Engine(registry engine)
+	slog.Info("Initializing registry engine")
+	engine, err := initializeRegistry()
+	if err != nil {
+		return err
+	}
+
+	// Run server
+	port := viper.GetString("server.port")
+	server := api.New(prod, engine)
+	return server.Run(port)
 }
 
-func startServer(cmd *cobra.Command, args []string) error {
-	cfg := GetAPIConfig()
-
+func setupLogging(prod bool) error {
 	Logging.SetMode(logging.ServerMode)
-	Logging.SetColoredJSON(!cfg.Prod)
+	if !prod {
+		Logging.EnableColor()
+	}
 	Logging.Apply()
-
-	slog.Info("Starting server...")
-
-	// Create API
-	api, err := api.New(&cfg)
-	if err != nil {
-		return fmt.Errorf("failed to initialize API, %w", err)
-	}
-
-	// Run API
-	if err := api.Run(":" + cfg.Port); err != nil {
-		return fmt.Errorf("failed to start API, %w", err)
-	}
-
 	return nil
+}
+
+func initializeRegistry() (*registry.Engine, error) {
+	opts := getRegistryOptions()
+	engine, err := registry.New(opts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize registry: %w", err)
+	}
+	return engine, nil
+}
+
+func getRegistryOptions() []registry.Option {
+	opts := []registry.Option{
+		registry.WithBucket(viper.GetString("storage.bucket")),
+	}
+
+	addIfSet := func(key string, optFunc func(string) registry.Option) {
+		if val := viper.GetString(key); val != "" {
+			opts = append(opts, optFunc(val))
+		}
+	}
+
+	addIfSet("storage.s3endpoint", registry.WithStorageEndpoint)
+	addIfSet("storage.prefix", registry.WithBucketPrefix)
+	addIfSet("database.endpoint", registry.WithDatabaseEndpoint)
+	addIfSet("database.user", registry.WithDatabaseUser)
+	addIfSet("database.password", registry.WithDatabasePassword)
+	addIfSet("database.name", registry.WithDatabaseName)
+
+	if viper.GetBool("database.ssl") {
+		opts = append(opts, registry.WithSslMode())
+	}
+
+	return opts
 }
 
 func bindServeFlags() {
