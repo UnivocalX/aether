@@ -66,7 +66,7 @@ func (load *LoadAssets) processFiles(files []string) []*v1.AssetPostRequest {
 		slog.Debug("adding new request", "path", path, "sha256", sha256)
 		requests = append(
 			requests, &v1.AssetPostRequest{
-				AssetPostUriParams: v1.AssetPostUriParams{
+				AssetUriParams: v1.AssetUriParams{
 					SHA256: sha256,
 				},
 				AssetPostPayload: v1.AssetPostPayload{

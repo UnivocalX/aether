@@ -8,6 +8,7 @@ import (
 
 	"github.com/UnivocalX/aether/pkg/registry"
 	"github.com/jackc/pgx/v5/pgconn"
+	"gorm.io/gorm"
 )
 
 type CreateAssetParams struct {
@@ -95,4 +96,54 @@ func (s *Service) handleCreateAssetTags(ctx context.Context, asset *registry.Ass
 	}
 
 	return nil
+}
+
+
+func (s *Service) AddTagToAsset(ctx context.Context, sha256 string, tagName string) error {
+	slog.Debug("attempting to add tag to asset", "tagName", tagName, "assetSha256", sha256)
+
+	asset, err := s.GetAsset(ctx, sha256)
+	if err != nil {
+		return err
+	}
+
+	tag, err := s.GetTag(ctx, tagName)
+	if err != nil {
+		return err
+	}
+
+	if err := s.registry.UpdateAssetTags(ctx, asset, []*registry.Tag{tag}); err != nil {
+		return fmt.Errorf("failed to update asset tags: %w", err)
+	}
+
+	return nil 
+}
+
+func (s *Service) GetAsset(ctx context.Context, sha256 string) (*registry.Asset, error) {
+	slog.Debug("attempting to get asset", "sha256", sha256)
+	asset, err := s.registry.GetAssetRecord(ctx, sha256)
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("%w: %s", ErrAssetNotFound, sha256)
+		}
+
+		return nil, fmt.Errorf("failed to get asset: %w", err)
+	}
+
+	return asset, nil
+}
+
+func (s *Service) GetAssetTags(ctx context.Context, sha256 string) ([]*registry.Tag, error) {
+	slog.Debug("attempting to get asset tags", "sha256", sha256)
+	tags, err := s.registry.GetAssetRecordTags(ctx, sha256)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("%w: %s", ErrAssetNotFound, sha256)
+		}
+
+		return nil, fmt.Errorf("failed to get asset tags: %w", err)
+	}
+
+	return tags, nil
 }

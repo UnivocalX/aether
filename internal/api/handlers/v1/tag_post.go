@@ -11,12 +11,12 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type TagPostUriParams struct {
+type TagUriParams struct {
 	Name string `uri:"name" binding:"required,min=1,max=100"`
 }
 
 type TagPostRequest struct {
-	TagPostUriParams
+	TagUriParams
 }
 
 type TagPostResponse struct {
@@ -28,7 +28,7 @@ func HandleCreateTag(svc *data.Service, ctx *gin.Context) {
 	var req TagPostRequest
 
 	// Bind URI parameters
-	if err := ctx.ShouldBindUri(&req.TagPostUriParams); err != nil {
+	if err := ctx.ShouldBindUri(&req.TagUriParams); err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Invalid URI parameters", "error", err.Error())
 		dto.BadRequest(ctx, "Invalid Name in URI")
 		return

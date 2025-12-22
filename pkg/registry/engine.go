@@ -236,8 +236,8 @@ func (engine *Engine) GetURLExpire(ctx context.Context, sha256 string, expire ti
 }
 
 func (engine *Engine) GetAssetRecord(ctx context.Context, sha256 string) (*Asset, error) {
+	slog.Debug("Getting asset", "checksum", sha256)
 	normalizedSha256 := NormalizeString(sha256)
-	slog.Debug("Getting asset", "checksum", normalizedSha256)
 
 	var asset Asset
 	err := engine.db(ctx).
@@ -249,6 +249,22 @@ func (engine *Engine) GetAssetRecord(ctx context.Context, sha256 string) (*Asset
 	}
 
 	return &asset, nil
+}
+
+func (engine *Engine) GetAssetRecordTags(ctx context.Context, sha256 string) ([]*Tag, error) {
+	slog.Debug("Getting asset tags", "checksum", sha256)
+
+	asset, err := engine.GetAssetRecord(ctx, sha256)
+	if err != nil {
+		return nil, err
+	}
+
+	var tags []*Tag
+	if err := engine.db(ctx).Model(asset).Association("Tags").Find(&tags); err != nil {
+		return nil, err 
+	}
+
+	return tags, nil 
 }
 
 func (engine *Engine) CreateAssetRecord(
@@ -326,8 +342,25 @@ func (engine *Engine) CreateTagRecord(ctx context.Context, name string) (*Tag, e
 	return tag, nil
 }
 
-func (engine *Engine) GetTagRecord(ctx context.Context, id uint) (*Tag, error) {
-	slog.Debug("Getting tag", "ID", id)
+func (engine *Engine) GetTagRecord(ctx context.Context, name string) (*Tag, error) {
+	normalizedName := NormalizeString(name)
+	slog.Debug("Getting tag", "name", name)
+	
+	var tag Tag
+	err := engine.db(ctx).
+		Where("name = ?", normalizedName).
+		First(&tag).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &tag, nil
+}
+
+
+func (engine *Engine) GetTagRecordById(ctx context.Context, id uint) (*Tag, error) {
+	slog.Debug("Getting tag", "id", id)
 
 	var tag Tag
 	if err := engine.db(ctx).First(&tag, id).Error; err != nil {

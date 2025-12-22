@@ -35,6 +35,13 @@ func Created(c *gin.Context, message string, data interface{}) {
 	})
 }
 
+func NoContent(c *gin.Context, message string) {
+	c.JSON(204, Response{
+		Message: message,
+		Meta:    buildMeta(c),
+	})
+}
+
 func MultiStatus(c *gin.Context, message string, data interface{}) {
 	c.JSON(207, Response{
 		Message: message,

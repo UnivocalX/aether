@@ -8,6 +8,7 @@ import (
 
 	"github.com/UnivocalX/aether/pkg/registry"
 	"github.com/jackc/pgx/v5/pgconn"
+	"gorm.io/gorm"
 )
 
 type CreateTagParams struct {
@@ -49,7 +50,7 @@ func (s *Service) getTagsByIDs(ctx context.Context, tagIDs []uint) ([]*registry.
 
 	tags := make([]*registry.Tag, 0, len(tagIDs))
 	for _, tagID := range tagIDs {
-		tag, err := s.registry.GetTagRecord(ctx, tagID)
+		tag, err := s.registry.GetTagRecordById(ctx, tagID)
 		if err != nil {
 			return nil, fmt.Errorf("failed getting tag %d: %w", tagID, err)
 		}
@@ -57,4 +58,19 @@ func (s *Service) getTagsByIDs(ctx context.Context, tagIDs []uint) ([]*registry.
 	}
 
 	return tags, nil
+}
+
+func (s *Service) GetTag(ctx context.Context, name string) (*registry.Tag, error) {
+	slog.Debug("attempting to get tag", "name", name)
+	tag, err := s.registry.GetTagRecord(ctx, name)
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("%w: %s", ErrTagNotFound, name)
+		}
+
+		return nil, fmt.Errorf("failed to get tag: %w", err)
+	}
+
+	return tag, nil
 }

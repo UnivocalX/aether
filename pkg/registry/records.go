@@ -18,6 +18,7 @@ type Asset struct {
 	MimeType        string
 	SizeBytes       int64
 	State           Status           `gorm:"type:status;not null;default:'pending'"`
+
 	Tags            []Tag            `gorm:"many2many:asset_tags;"`
 	DatasetVersions []DatasetVersion `gorm:"many2many:asset_dataset_versions;"`
 	Peers           []Peer           `gorm:"many2many:asset_peers;"`

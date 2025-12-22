@@ -14,7 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type AssetPostUriParams struct {
+type AssetUriParams struct {
 	SHA256 string `uri:"sha256" binding:"required,len=64,hexadecimal"`
 }
 
@@ -25,7 +25,7 @@ type AssetPostPayload struct {
 }
 
 type AssetPostRequest struct {
-	AssetPostUriParams
+	AssetUriParams
 	AssetPostPayload
 }
 
@@ -37,12 +37,28 @@ type AssetPostResponse struct {
 	ExpiresAt *time.Time `json:"expires_at,omitempty"`
 }
 
+// mapToAssetPostResponse converts service result to API response
+func NewAssetPostResponse(result *data.CreateAssetResult) *AssetPostResponse {
+	response := &AssetPostResponse{
+		ID:       result.Asset.ID,
+		Checksum: result.Asset.Checksum,
+		State:    string(result.Asset.State),
+	}
+
+	if result.UploadURL != nil {
+		response.UploadURL = result.UploadURL.URL.Value()
+		response.ExpiresAt = &result.UploadURL.ExpiresAt
+	}
+
+	return response
+}
+
 // HandleCreateAsset handles the HTTP Asset post request/response cycle
 func HandleCreateAsset(svc *data.Service, ctx *gin.Context) {
 	var req AssetPostRequest
 
 	// Bind URI parameters
-	if err := ctx.ShouldBindUri(&req.AssetPostUriParams); err != nil {
+	if err := ctx.ShouldBindUri(&req.AssetUriParams); err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Invalid URI parameters", "error", err.Error())
 		dto.BadRequest(ctx, "Invalid SHA256 in URI")
 		return
@@ -64,13 +80,12 @@ func HandleCreateAsset(svc *data.Service, ctx *gin.Context) {
 	})
 
 	// Handle errors
-	if result.Err != nil {		
+	if result.Err != nil {
 		handleCreateAssetError(ctx, result.Err, req.SHA256)
 		return
 	}
 
-	// Build API response for successful creation
-	response := buildAssetPostResponse(result)
+	response := NewAssetPostResponse(result)
 
 	// Success response
 	slog.InfoContext(ctx.Request.Context(), "asset created successfully",
@@ -79,22 +94,6 @@ func HandleCreateAsset(svc *data.Service, ctx *gin.Context) {
 	)
 
 	dto.Created(ctx, "Successfully created asset", response)
-}
-
-// mapToAssetPostResponse converts service result to API response
-func buildAssetPostResponse(result *data.CreateAssetResult) *AssetPostResponse {
-	response := &AssetPostResponse{
-		ID:       result.Asset.ID,
-		Checksum: result.Asset.Checksum,
-		State:    string(result.Asset.State),
-	}
-
-	if result.UploadURL != nil {
-		response.UploadURL = result.UploadURL.URL.Value()
-		response.ExpiresAt = &result.UploadURL.ExpiresAt
-	}
-
-	return response
 }
 
 // handleCreateAssetError maps business errors to HTTP responses
