@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/aws/protocol/query"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
@@ -390,13 +389,13 @@ func (engine *Engine) GetTagRecordById(ctx context.Context, id uint) (*Tag, erro
 	return &tag, nil
 }
 
-func (engine *Engine) ListAssets(ctx context.Context, opts ...SearchAssetsOption) ([]*Asset, error) {
-	slog.Debug("Listing assets", "totalOptions", len(opts))
+// func (engine *Engine) ListAssets(ctx context.Context, opts ...SearchAssetsOption) ([]*Asset, error) {
+// 	slog.Debug("Listing assets", "totalOptions", len(opts))
 
-	query, err := NewSearchAssetsQuery(opts...)
-	if err != nil {
-		return nil, err
-	}
+// 	query, err := NewSearchAssetsQuery(opts...)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	
-}
+
+// }
