@@ -1,0 +1,228 @@
+{
+	"info": {
+		"_postman_id": "196f2f19-4f2a-4ac5-baf1-f10d3ebd8bd8",
+		"name": "Aether API",
+		"description": "API collection for Aether asset management system. Provides endpoints for managing assets, tags, and retrieving presigned URLs.\n\n**Base URL:** `{{base_url}}`\n**Version:** v1\n\n**Getting Started:**\n1. Import the collection\n2. Set up environment variables (see Variables tab)\n3. Update the `asset_hash` variable with a valid SHA256 hash",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "40546750"
+	},
+	"item": [
+		{
+			"name": "v1",
+			"item": [
+				{
+					"name": "Assets",
+					"item": [
+						{
+							"name": "Create Asset",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"display\": \"{{$randomFileName}}\",\n    \"tags\": [1, 4, 6],\n    \"extra\": {\n        \"user\": \"{{$randomUserName}}\",\n        \"department\": \"engineering\",\n        \"project\": \"alpha\"\n    }\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/assets/{{asset_hash}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"assets",
+										"{{asset_hash}}"
+									]
+								},
+								"description": "Creates a new asset record with the specified hash. The hash should be a SHA256 hash of the asset content.\n\n**Path Parameters:**\n- `hash` (string): SHA256 hash of the asset\n\n**Body:**\n- `display` (string): Human-readable display name\n- `tags` (array): Array of tag IDs to associate\n- `extra` (object): Additional metadata (optional)"
+							},
+							"response": []
+						},
+						{
+							"name": "Get Asset",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/assets/{{asset_hash}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"assets",
+										"{{asset_hash}}"
+									]
+								},
+								"description": "Retrieves a specific asset by its SHA256 hash.\n\n**Path Parameters:**\n- `hash` (string): SHA256 hash of the asset"
+							},
+							"response": []
+						},
+						{
+							"name": "Get Asset Tags",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/assets/{{asset_hash}}/tags",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"assets",
+										"{{asset_hash}}",
+										"tags"
+									]
+								},
+								"description": "Retrieves all tags associated with a specific asset.\n\n**Path Parameters:**\n- `hash` (string): SHA256 hash of the asset"
+							},
+							"response": []
+						},
+						{
+							"name": "Get Asset Presigned URL",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/assets/{{asset_hash}}/presignedUrl",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"assets",
+										"{{asset_hash}}",
+										"presignedUrl"
+									]
+								},
+								"description": "Generates a presigned URL for downloading the asset from storage.\n\n**Path Parameters:**\n- `hash` (string): SHA256 hash of the asset\n\n**Response:**\n- `url` (string): Temporary presigned URL for asset download\n- `expires_at` (string): Expiration timestamp (if applicable)"
+							},
+							"response": []
+						},
+						{
+							"name": "Add Tag to Asset",
+							"request": {
+								"method": "PUT",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/assets/{{asset_hash}}/tags/{{tag_name}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"assets",
+										"{{asset_hash}}",
+										"tags",
+										"{{tag_name}}"
+									]
+								},
+								"description": "Associates a tag with an asset. Creates the tag if it doesn't exist.\n\n**Path Parameters:**\n- `hash` (string): SHA256 hash of the asset\n- `tag` (string): Tag name to add"
+							},
+							"response": []
+						},
+						{
+							"name": "Remove Tag from Asset",
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/assets/{{asset_hash}}/tags/{{tag_name}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"assets",
+										"{{asset_hash}}",
+										"tags",
+										"{{tag_name}}"
+									]
+								},
+								"description": "Removes a tag association from an asset.\n\n**Path Parameters:**\n- `hash` (string): SHA256 hash of the asset\n- `tag` (string): Tag name to remove"
+							},
+							"response": []
+						}
+					],
+					"description": "Operations for managing assets in the registry"
+				},
+				{
+					"name": "Tags",
+					"item": [
+						{
+							"name": "Create Tag",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"description\": \"Tag for production assets\",\n    \"color\": \"#FF5733\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/tags/{{tag_name}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"tags",
+										"{{tag_name}}"
+									]
+								},
+								"description": "Creates a new tag in the system.\n\n**Path Parameters:**\n- `tag` (string): Tag name\n\n**Body:**\n- `description` (string): Tag description (optional)\n- `color` (string): Hex color code for UI (optional)"
+							},
+							"response": []
+						}
+					],
+					"description": "Operations for managing tags"
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"requests": {},
+				"exec": [
+					"// Global pre-request script",
+					"// Add authentication headers or timestamps here if needed"
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"requests": {},
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "asset_hash",
+			"value": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"key": "tag_name",
+			"value": "production"
+		}
+	]
+}
