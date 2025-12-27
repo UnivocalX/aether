@@ -82,7 +82,7 @@ func initializeRegistry() (*registry.Engine, error) {
 
 func getRegistryOptions() []registry.Option {
 	opts := []registry.Option{
-		registry.WithBucket(viper.GetString("storage.bucket")),
+		registry.WithBucket(viper.GetString("server.storage.bucket")),
 	}
 
 	addIfSet := func(key string, optFunc func(string) registry.Option) {
@@ -91,14 +91,14 @@ func getRegistryOptions() []registry.Option {
 		}
 	}
 
-	addIfSet("storage.s3endpoint", registry.WithStorageEndpoint)
-	addIfSet("storage.prefix", registry.WithBucketPrefix)
-	addIfSet("database.endpoint", registry.WithDatabaseEndpoint)
-	addIfSet("database.user", registry.WithDatabaseUser)
-	addIfSet("database.password", registry.WithDatabasePassword)
-	addIfSet("database.name", registry.WithDatabaseName)
+	addIfSet("server.storage.s3endpoint", registry.WithStorageEndpoint)
+	addIfSet("server.storage.prefix", registry.WithBucketPrefix)
+	addIfSet("server.database.endpoint", registry.WithDatabaseEndpoint)
+	addIfSet("server.database.user", registry.WithDatabaseUser)
+	addIfSet("server.database.password", registry.WithDatabasePassword)
+	addIfSet("server.database.name", registry.WithDatabaseName)
 
-	if viper.GetBool("database.ssl") {
+	if viper.GetBool("server.database.ssl") {
 		opts = append(opts, registry.WithSslMode())
 	}
 
@@ -111,14 +111,14 @@ func bindServeFlags() {
 	viper.BindPFlag("server.production", serveCmd.Flags().Lookup("production"))
 
 	// Storage settings
-	viper.BindPFlag("storage.s3endpoint", serveCmd.Flags().Lookup("s3endpoint"))
-	viper.BindPFlag("storage.bucket", serveCmd.Flags().Lookup("bucket"))
-	viper.BindPFlag("storage.prefix", serveCmd.Flags().Lookup("prefix"))
+	viper.BindPFlag("server.storage.s3endpoint", serveCmd.Flags().Lookup("s3endpoint"))
+	viper.BindPFlag("server.storage.bucket", serveCmd.Flags().Lookup("bucket"))
+	viper.BindPFlag("server.storage.prefix", serveCmd.Flags().Lookup("prefix"))
 
 	// Database settings
-	viper.BindPFlag("database.endpoint", serveCmd.Flags().Lookup("db-endpoint"))
-	viper.BindPFlag("database.user", serveCmd.Flags().Lookup("db-user"))
-	viper.BindPFlag("database.password", serveCmd.Flags().Lookup("db-password"))
-	viper.BindPFlag("database.name", serveCmd.Flags().Lookup("db-name"))
-	viper.BindPFlag("database.ssl", serveCmd.Flags().Lookup("ssl"))
+	viper.BindPFlag("server.database.endpoint", serveCmd.Flags().Lookup("db-endpoint"))
+	viper.BindPFlag("server.database.user", serveCmd.Flags().Lookup("db-user"))
+	viper.BindPFlag("server.database.password", serveCmd.Flags().Lookup("db-password"))
+	viper.BindPFlag("server.database.name", serveCmd.Flags().Lookup("db-name"))
+	viper.BindPFlag("server.database.ssl", serveCmd.Flags().Lookup("ssl"))
 }
