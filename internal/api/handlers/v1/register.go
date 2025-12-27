@@ -19,6 +19,10 @@ func RegisterRoutes(r gin.IRouter, svc *data.Service) {
 		HandleGetAssetTags(svc, ctx)
 	})
 
+	v1.GET("/assets/:sha256/presignedUrl", func(ctx *gin.Context) {
+		HandleGetAssetUrl(svc, ctx)
+	})
+
 	v1.POST("/assets/:sha256", func(ctx *gin.Context) {
 		HandleCreateAsset(svc, ctx)
 	})
@@ -29,5 +33,9 @@ func RegisterRoutes(r gin.IRouter, svc *data.Service) {
 
 	v1.PUT("/assets/:sha256/tags/:name", func(ctx *gin.Context) {
 		HandleTaggingAsset(svc, ctx)
+	})
+
+	v1.DELETE("/assets/:sha256/tags/:name", func(ctx *gin.Context) {
+		HandleUntaggingAsset(svc, ctx)
 	})
 }

@@ -173,8 +173,8 @@ func (e Endpoint) String() string {
 	return string(e)
 }
 
-// PresignUrl contains presigned URL information including expiry and metadata
-type PresignUrl struct {
+// PresignedUrl contains presigned URL information including expiry and metadata
+type PresignedUrl struct {
 	URL       Secret        `json:"url"`
 	ExpiresAt time.Time     `json:"expires_at"`
 	ExpiresIn time.Duration `json:"expires_in"`
@@ -185,16 +185,16 @@ type PresignUrl struct {
 }
 
 // IsExpired checks if the presigned URL has expired
-func (p *PresignUrl) IsExpired() bool {
+func (p *PresignedUrl) IsExpired() bool {
 	return time.Now().After(p.ExpiresAt)
 }
 
 // TimeUntilExpiry returns the duration until the URL expires
-func (p *PresignUrl) TimeUntilExpiry() time.Duration {
+func (p *PresignedUrl) TimeUntilExpiry() time.Duration {
 	return time.Until(p.ExpiresAt)
 }
 
-func (p *PresignUrl) String() string {
+func (p *PresignedUrl) String() string {
 	return fmt.Sprintf("PresignUrl{Operation: %s, Bucket: %s, Key: %s, ExpiresAt: %s, ExpiresIn: %s}",
 		p.Operation,
 		p.Bucket,

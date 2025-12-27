@@ -4,7 +4,12 @@ import (
 	"fmt"
 )
 
-type SearchAssetsConfig struct {
+const (
+	SearchDefaultLimit = 150
+	SearchMaxLimit     = 1000
+)
+
+type SearchAssetsQuery struct {
 	Cursor       uint
 	Limit        uint
 	MimeType     string
@@ -13,76 +18,123 @@ type SearchAssetsConfig struct {
 	ExcludedTags []string
 }
 
-func NewSearchAssetsOptions() SearchAssetsConfig {
-	return SearchAssetsConfig{
+func (q SearchAssetsQuery) String() string {
+    return fmt.Sprintf(
+        "SearchAssetsQuery{Cursor: %d, Limit: %d, MimeType: %q, State: %v, IncludedTags: %v, ExcludedTags: %v}",
+        q.Cursor, q.Limit, q.MimeType, q.State, q.IncludedTags, q.ExcludedTags,
+    )
+}
+
+type SearchAssetsOption func(*SearchAssetsQuery) error
+
+func WithCursor(cursor uint) SearchAssetsOption {
+	return func(q *SearchAssetsQuery) error {
+		q.Cursor = cursor
+		return nil
+	}
+}
+
+func WithLimit(limit uint) SearchAssetsOption {
+	return func(q *SearchAssetsQuery) error {
+		if limit == 0 {
+			return fmt.Errorf("limit must be greater than 0")
+		}
+		if limit > SearchMaxLimit {
+			return fmt.Errorf("limit cannot exceed %d", SearchMaxLimit)
+		}
+		q.Limit = limit
+		return nil
+	}
+}
+
+func WithMimeType(mimeType string) SearchAssetsOption {
+	return func(q *SearchAssetsQuery) error {
+		normalized := NormalizeString(mimeType)
+		if normalized == "" {
+			return fmt.Errorf("mime type cannot be empty")
+		}
+
+		q.MimeType = normalized
+		return nil
+	}
+}
+
+func WithState(state Status) SearchAssetsOption {
+	return func(q *SearchAssetsQuery) error {
+		q.State = state
+		return nil
+	}
+}
+
+func WithIncludedTags(tags ...string) SearchAssetsOption {
+	return func(q *SearchAssetsQuery) error {
+		if len(tags) == 0 {
+			return fmt.Errorf("at least one included tag must be provided")
+		}
+
+		cleaned := make([]string, 0, len(tags))
+		seen := make(map[string]bool)
+		
+		for _, tag := range tags {
+			normalized := NormalizeString(tag)
+			if normalized == "" {
+				return fmt.Errorf("tag cannot be empty or whitespace")
+			}
+
+			if seen[normalized] {
+				continue
+			}
+
+			seen[normalized] = true
+			cleaned = append(cleaned, normalized)
+		}
+		q.IncludedTags = cleaned
+		return nil
+	}
+}
+
+func WithExcludedTags(tags ...string) SearchAssetsOption {
+	return func(q *SearchAssetsQuery) error {
+		if len(tags) == 0 {
+			return fmt.Errorf("at least one excluded tag must be provided")
+		}
+		
+		cleaned := make([]string, 0, len(tags))
+		seen := make(map[string]bool)
+		
+		for _, tag := range tags {
+			normalized := NormalizeString(tag)
+			if normalized == "" {
+				return fmt.Errorf("tag cannot be empty or whitespace")
+			}
+
+			if seen[normalized] {
+				continue
+			}
+
+			seen[normalized] = true
+			cleaned = append(cleaned, normalized)
+		}
+		q.ExcludedTags = cleaned
+		return nil
+	}
+}
+
+func NewSearchAssetsQuery(opts ...SearchAssetsOption) (*SearchAssetsQuery, error) {
+	// Initialize with defaults
+	query := &SearchAssetsQuery{
 		Cursor:       0,
-		Limit:        150,
-		MimeType:     "",
-		State:        "",
+		Limit:        SearchDefaultLimit,
 		IncludedTags: []string{},
 		ExcludedTags: []string{},
 	}
-}
 
-// Validate checks if the search options are valid
-func (cfg *SearchAssetsConfig) Validate() error {
-	// Set default limit
-	if cfg.Limit == 0 {
-		cfg.Limit = 150
-	}
-
-	// Prevent excessive queries
-	if cfg.Limit > 1000 {
-		cfg.Limit = 1000
-	}
-
-	// Validate MIME type format if provided
-	if cfg.MimeType != "" && !ValidateString(cfg.MimeType) {
-		return fmt.Errorf("invalid MIME type format: %s", cfg.MimeType)
-	}
-
-	// Validate tag names
-	for _, tag := range append(cfg.IncludedTags, cfg.ExcludedTags...) {
-		if !ValidateString(tag) {
-			return fmt.Errorf("invalid tag name: %s", tag)
+	// Apply all options
+	for _, opt := range opts {
+		if err := opt(query); err != nil {
+			return nil, fmt.Errorf("failed to apply option: %w", err)
 		}
 	}
 
-	return nil
-}
-
-// Normalize applies normalization to all fields
-func (cfg *SearchAssetsConfig) Normalize() {
-	cfg.MimeType = NormalizeString(cfg.MimeType)
-	cfg.IncludedTags = normalizeTags(cfg.IncludedTags)
-	cfg.ExcludedTags = normalizeTags(cfg.ExcludedTags)
-}
-
-// normalizeTags cleans up tag arrays using existing functions
-func normalizeTags(tags []string) []string {
-	if len(tags) == 0 {
-		return tags
-	}
-
-	seen := make(map[string]bool)
-	result := make([]string, 0, len(tags))
-
-	for _, tag := range tags {
-		normalized := NormalizeString(tag)
-		if normalized != "" && !seen[normalized] {
-			seen[normalized] = true
-			result = append(result, normalized)
-		}
-	}
-
-	return result
-}
-
-// IsEmpty checks if this is effectively an empty search
-func (cfg *SearchAssetsConfig) IsEmpty() bool {
-	return cfg.Cursor == 0 &&
-		cfg.MimeType == "" &&
-		cfg.State == "" &&
-		len(cfg.IncludedTags) == 0 &&
-		len(cfg.ExcludedTags) == 0
+	return query, nil
 }

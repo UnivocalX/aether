@@ -21,7 +21,7 @@ type CreateAssetParams struct {
 // Service layer result - internal representation
 type CreateAssetResult struct {
 	Asset     *registry.Asset
-	UploadURL *registry.PresignUrl
+	UploadURL *registry.PresignedUrl
 	Err       error
 }
 
@@ -91,16 +91,15 @@ func (s *Service) handleCreateAssetTags(ctx context.Context, asset *registry.Ass
 	}
 
 	// Associate tags with asset
-	if err := s.registry.UpdateAssetTags(ctx, asset, tags); err != nil {
+	if err := s.registry.DetachTags(ctx, asset, tags); err != nil {
 		return fmt.Errorf("failed associating tags with asset: %w", err)
 	}
 
 	return nil
 }
 
-
-func (s *Service) AddTagToAsset(ctx context.Context, sha256 string, tagName string) error {
-	slog.Debug("attempting to add tag to asset", "tagName", tagName, "assetSha256", sha256)
+func (s *Service) TagAsset(ctx context.Context, sha256 string, tagName string) error {
+	slog.Debug("attempting to tag asset", "tagName", tagName, "assetSha256", sha256)
 
 	asset, err := s.GetAsset(ctx, sha256)
 	if err != nil {
@@ -112,11 +111,31 @@ func (s *Service) AddTagToAsset(ctx context.Context, sha256 string, tagName stri
 		return err
 	}
 
-	if err := s.registry.UpdateAssetTags(ctx, asset, []*registry.Tag{tag}); err != nil {
-		return fmt.Errorf("failed to update asset tags: %w", err)
+	if err := s.registry.DetachTags(ctx, asset, []*registry.Tag{tag}); err != nil {
+		return fmt.Errorf("failed to tag asset: %w", err)
 	}
 
-	return nil 
+	return nil
+}
+
+func (s *Service) UntagAsset(ctx context.Context, sha256 string, tagName string) error {
+	slog.Debug("attempting to untag asset", "tagName", tagName, "assetSha256", sha256)
+
+	asset, err := s.GetAsset(ctx, sha256)
+	if err != nil {
+		return err
+	}
+
+	tag, err := s.GetTag(ctx, tagName)
+	if err != nil {
+		return err
+	}
+
+	if err := s.registry.AttachTags(ctx, asset, []*registry.Tag{tag}); err != nil {
+		return fmt.Errorf("failed to untag asset: %w", err)
+	}
+
+	return nil
 }
 
 func (s *Service) GetAsset(ctx context.Context, sha256 string) (*registry.Asset, error) {
@@ -146,4 +165,26 @@ func (s *Service) GetAssetTags(ctx context.Context, sha256 string) ([]*registry.
 	}
 
 	return tags, nil
+}
+
+func (s *Service) GetAssetPresignedUrl(ctx context.Context, sha256 string) (*registry.PresignedUrl, error) {
+	slog.Debug("attempting to get asset Presigned Url", "sha256", sha256)
+
+	// Check asset status
+	asset, err := s.registry.GetAssetRecord(ctx, sha256)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("%w: %s", ErrAssetNotFound, sha256)
+		}
+
+		return nil, fmt.Errorf("failed to get asset presigned url: %w", err)
+	}
+
+	// reuploading a ready asset is not allowed
+	if asset.State == registry.StatusReady {
+		slog.Warn("attempt to get presigned url for ready asset", "Sha256", sha256)
+		return nil, fmt.Errorf("%w: %s", ErrAssetIsReady, sha256)
+	}
+
+	return s.registry.PutURL(ctx, sha256)
 }

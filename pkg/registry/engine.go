@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/protocol/query"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
@@ -150,11 +151,11 @@ func (engine *Engine) CuratedKey(sha256 string) string {
 }
 
 // PutURL generates a presigned URL for upload (default expiry)
-func (engine *Engine) PutURL(ctx context.Context, sha256 string) (*PresignUrl, error) {
-	return engine.PutURLExpire(ctx, sha256, DEFAULT_PRESIGN_TTL)
+func (engine *Engine) PutURL(ctx context.Context, sha256 string) (*PresignedUrl, error) {
+	return engine.PutUrlExpire(ctx, sha256, DEFAULT_PRESIGN_TTL)
 }
 
-func (engine *Engine) PutURLExpire(ctx context.Context, sha256 string, expire time.Duration) (*PresignUrl, error) {
+func (engine *Engine) PutUrlExpire(ctx context.Context, sha256 string, expire time.Duration) (*PresignedUrl, error) {
 	key := engine.IngressKey(sha256)
 
 	input := &s3.PutObjectInput{
@@ -175,7 +176,7 @@ func (engine *Engine) PutURLExpire(ctx context.Context, sha256 string, expire ti
 	now := time.Now()
 	expiresAt := now.Add(expire)
 
-	presignUrl := &PresignUrl{
+	presignUrl := &PresignedUrl{
 		URL:       Secret(res.URL),
 		ExpiresAt: expiresAt,
 		ExpiresIn: expire,
@@ -194,12 +195,12 @@ func (engine *Engine) PutURLExpire(ctx context.Context, sha256 string, expire ti
 }
 
 // GetURL generates a presigned URL for download (default expiry)
-func (engine *Engine) GetURL(ctx context.Context, sha256 string) (*PresignUrl, error) {
-	return engine.GetURLExpire(ctx, sha256, DEFAULT_PRESIGN_TTL)
+func (engine *Engine) GetURL(ctx context.Context, sha256 string) (*PresignedUrl, error) {
+	return engine.GetUrlExpire(ctx, sha256, DEFAULT_PRESIGN_TTL)
 }
 
-// GetURLExpire generates a presigned URL for download with custom expiry
-func (engine *Engine) GetURLExpire(ctx context.Context, sha256 string, expire time.Duration) (*PresignUrl, error) {
+// GetUrlExpire generates a presigned URL for download with custom expiry
+func (engine *Engine) GetUrlExpire(ctx context.Context, sha256 string, expire time.Duration) (*PresignedUrl, error) {
 	key := engine.CuratedKey(sha256)
 
 	input := &s3.GetObjectInput{
@@ -217,7 +218,7 @@ func (engine *Engine) GetURLExpire(ctx context.Context, sha256 string, expire ti
 	now := time.Now()
 	expiresAt := now.Add(expire)
 
-	presignUrl := &PresignUrl{
+	presignUrl := &PresignedUrl{
 		URL:       Secret(res.URL),
 		ExpiresAt: expiresAt,
 		ExpiresIn: expire,
@@ -261,10 +262,10 @@ func (engine *Engine) GetAssetRecordTags(ctx context.Context, sha256 string) ([]
 
 	var tags []*Tag
 	if err := engine.db(ctx).Model(asset).Association("Tags").Find(&tags); err != nil {
-		return nil, err 
+		return nil, err
 	}
 
-	return tags, nil 
+	return tags, nil
 }
 
 func (engine *Engine) CreateAssetRecord(
@@ -308,7 +309,7 @@ func (engine *Engine) UpdateAssetRecord(ctx context.Context, asset *Asset) error
 		First(asset, asset.ID).Error
 }
 
-func (engine *Engine) UpdateAssetTags(ctx context.Context, asset *Asset, tags []*Tag) error {
+func (engine *Engine) DetachTags(ctx context.Context, asset *Asset, tags []*Tag) error {
 	slog.Debug("Attempting to update asset tags", "AssetID", asset.ID, "tagCount", len(tags))
 
 	if len(tags) == 0 {
@@ -317,6 +318,26 @@ func (engine *Engine) UpdateAssetTags(ctx context.Context, asset *Asset, tags []
 
 	// Append all tags at once
 	if err := engine.db(ctx).Model(asset).Association("Tags").Append(tags); err != nil {
+		return err
+	}
+
+	// Single reload for all tags
+	if err := engine.db(ctx).Preload("Tags").First(asset, asset.ID).Error; err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (engine *Engine) AttachTags(ctx context.Context, asset *Asset, tags []*Tag) error {
+	slog.Debug("Attempting to remove asset tags", "AssetID", asset.ID, "tagCount", len(tags))
+
+	if len(tags) == 0 {
+		return nil
+	}
+
+	// Append all tags at once
+	if err := engine.db(ctx).Model(asset).Association("Tags").Delete(tags); err != nil {
 		return err
 	}
 
@@ -345,7 +366,7 @@ func (engine *Engine) CreateTagRecord(ctx context.Context, name string) (*Tag, e
 func (engine *Engine) GetTagRecord(ctx context.Context, name string) (*Tag, error) {
 	normalizedName := NormalizeString(name)
 	slog.Debug("Getting tag", "name", name)
-	
+
 	var tag Tag
 	err := engine.db(ctx).
 		Where("name = ?", normalizedName).
@@ -358,7 +379,6 @@ func (engine *Engine) GetTagRecord(ctx context.Context, name string) (*Tag, erro
 	return &tag, nil
 }
 
-
 func (engine *Engine) GetTagRecordById(ctx context.Context, id uint) (*Tag, error) {
 	slog.Debug("Getting tag", "id", id)
 
@@ -370,124 +390,13 @@ func (engine *Engine) GetTagRecordById(ctx context.Context, id uint) (*Tag, erro
 	return &tag, nil
 }
 
-func (engine *Engine) ListTags(ctx context.Context, cursor uint, limit int) ([]*Tag, uint, bool, error) {
-	if limit <= 0 {
-		limit = 50
+func (engine *Engine) ListAssets(ctx context.Context, opts ...SearchAssetsOption) ([]*Asset, error) {
+	slog.Debug("Listing assets", "totalOptions", len(opts))
+
+	query, err := NewSearchAssetsQuery(opts...)
+	if err != nil {
+		return nil, err
 	}
 
-	fetchLimit := limit + 1
-	var tags []*Tag
-
-	query := engine.db(ctx).Limit(fetchLimit)
-
-	if cursor > 0 {
-		query = query.Where("id > ?", cursor)
-	}
-
-	if err := query.Order("id ASC").Find(&tags).Error; err != nil {
-		return nil, 0, false, err
-	}
-
-	hasMore := len(tags) > limit
-	if hasMore {
-		tags = tags[:limit]
-	}
-
-	nextCursor := uint(0)
-	if len(tags) > 0 {
-		nextCursor = tags[len(tags)-1].ID
-	}
-
-	return tags, nextCursor, hasMore, nil
-}
-
-func (engine *Engine) ListAssets(ctx context.Context, cfg *SearchAssetsConfig) ([]*Asset, uint, bool, error) {
-	// Use the constructor function and validate
-	if cfg == nil {
-		defaultOpts := NewSearchAssetsOptions()
-		cfg = &defaultOpts
-	}
-
-	// Validate and normalize options using the struct methods
-	cfg.Normalize()
-	if err := cfg.Validate(); err != nil {
-		return nil, 0, false, fmt.Errorf("invalid search options: %w", err)
-	}
-
-	// Build query
-	query := engine.buildSearchAssetQuery(ctx, cfg)
-
-	// Preload relationships
-	query = query.Preload("Tags").Preload("Peers").Preload("DatasetVersions")
-
-	// Get total count for the current filters
-	var totalCount int64
-	countQuery := engine.buildSearchAssetQuery(ctx, cfg).Model(&Asset{})
-	if err := countQuery.Count(&totalCount).Error; err != nil {
-		return nil, 0, false, fmt.Errorf("failed to count assets: %w", err)
-	}
-
-	// Apply pagination (fetch +1 to check for more results)
-	// Convert uint to int for GORM Limit()
-	limit := int(cfg.Limit)
-	query = query.Order("id ASC").Limit(limit + 1)
-
-	// Execute query
-	var assets []*Asset
-	if err := query.Find(&assets).Error; err != nil {
-		return nil, 0, false, fmt.Errorf("failed to fetch assets: %w", err)
-	}
-
-	// Determine pagination info
-	hasMore := len(assets) > limit
-	if hasMore {
-		assets = assets[:limit] // Remove the extra item
-	}
-
-	nextCursor := uint(0)
-	if len(assets) > 0 {
-		nextCursor = assets[len(assets)-1].ID
-	}
-
-	return assets, nextCursor, hasMore, nil
-}
-
-func (engine *Engine) buildSearchAssetQuery(ctx context.Context, cfg *SearchAssetsConfig) *gorm.DB {
-	query := engine.db(ctx).Model(&Asset{})
-
-	if cfg.MimeType != "" {
-		query = query.Where("mime_type = ?", cfg.MimeType)
-	}
-
-	if cfg.State != "" {
-		query = query.Where("state = ?", cfg.State)
-	}
-
-	if cfg.Cursor > 0 {
-		query = query.Where("id > ?", cfg.Cursor)
-	}
-
-	// Safer included tags handling
-	for _, tag := range cfg.IncludedTags {
-		query = query.Where("EXISTS (?)",
-			engine.db(ctx).Select("1").
-				Table("asset_tags").
-				Joins("JOIN tags ON tags.id = asset_tags.tag_id").
-				Where("asset_tags.asset_id = assets.id").
-				Where("tags.name = ?", tag),
-		)
-	}
-
-	// Handle excluded tags
-	if len(cfg.ExcludedTags) > 0 {
-		query = query.Where("NOT EXISTS (?)",
-			engine.db(ctx).Select("1").
-				Table("asset_tags").
-				Joins("JOIN tags ON tags.id = asset_tags.tag_id").
-				Where("asset_tags.asset_id = assets.id").
-				Where("tags.name IN ?", cfg.ExcludedTags),
-		)
-	}
-
-	return query
+	
 }

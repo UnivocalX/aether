@@ -30,7 +30,7 @@ func HandleTaggingAsset(svc *data.Service, ctx *gin.Context) {
 		return
 	}
 
-	if err := svc.AddTagToAsset(ctx.Request.Context(), req.SHA256, req.Name); err != nil {
+	if err := svc.TagAsset(ctx.Request.Context(), req.SHA256, req.Name); err != nil {
 		handleTaggingAssetError(ctx, err, req.SHA256, req.Name)
 		return
 	}
