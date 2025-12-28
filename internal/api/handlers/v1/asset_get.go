@@ -29,19 +29,18 @@ type AssetGetResponse struct {
 	State     registry.Status `json:"state"`
 }
 
-
 func NewAssetGetResponse(asset *registry.Asset) *AssetGetResponse {
-    return &AssetGetResponse{
-        ID:        asset.ID,
-        CreatedAt: asset.CreatedAt.Format(time.RFC3339),
-        UpdatedAt: asset.UpdatedAt.Format(time.RFC3339),
-        Checksum:  asset.Checksum,
-        Display:   asset.Display,
-        Extra:     json.RawMessage(asset.Extra),
-        MimeType:  asset.MimeType,
-        SizeBytes: asset.SizeBytes,
-        State:     asset.State,
-    }
+	return &AssetGetResponse{
+		ID:        asset.ID,
+		CreatedAt: asset.CreatedAt.Format(time.RFC3339),
+		UpdatedAt: asset.UpdatedAt.Format(time.RFC3339),
+		Checksum:  asset.Checksum,
+		Display:   asset.Display,
+		Extra:     json.RawMessage(asset.Extra),
+		MimeType:  asset.MimeType,
+		SizeBytes: asset.SizeBytes,
+		State:     asset.State,
+	}
 }
 
 func HandleGetAsset(svc *data.Service, ctx *gin.Context) {

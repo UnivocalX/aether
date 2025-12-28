@@ -25,7 +25,7 @@
 								],
 								"body": {
 									"mode": "raw",
-									"raw": "{\n    \"display\": \"{{$randomFileName}}\",\n    \"tags\": [1, 4, 6],\n    \"extra\": {\n        \"user\": \"{{$randomUserName}}\",\n        \"department\": \"engineering\",\n        \"project\": \"alpha\"\n    }\n}",
+									"raw": "{\n    \"display\": \"{{$randomFileName}}\",\n    \"tags\": [\"test\", \"en\"],\n    \"extra\": {\n        \"user\": \"{{$randomUserName}}\",\n        \"department\": \"engineering\",\n        \"project\": \"alpha\"\n    }\n}",
 									"options": {
 										"raw": {
 											"language": "json"
@@ -144,6 +144,35 @@
 									]
 								},
 								"description": "Removes a tag association from an asset.\n\n**Path Parameters:**\n- `hash` (string): SHA256 hash of the asset\n- `tag` (string): Tag name to remove"
+							},
+							"response": []
+						},
+						{
+							"name": "List Assets",
+							"protocolProfileBehavior": {
+								"disableBodyPruning": true
+							},
+							"request": {
+								"method": "GET",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    // \"included_tags\": [\"test\", \"en\", \"local\"],\n    // \"excluded_tags\": [\"production\"]\n    \"cursor\": 39,\n    \"limit\": 10,\n    \"mime_type\": \"\",\n    \"state\": \"pending\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/assets",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"assets"
+									]
+								}
 							},
 							"response": []
 						}
