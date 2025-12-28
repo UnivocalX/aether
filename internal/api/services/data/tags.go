@@ -56,3 +56,17 @@ func (s *Service) GetTag(ctx context.Context, name string) (*registry.Tag, error
 
 	return tag, nil
 }
+
+func (s *Service) GetTagAssets(ctx context.Context, name string) ([]*registry.Asset, error) {
+	slog.Debug("attempting to get tag assets", "name", name)
+	assets, err := s.registry.GetTagRecordAssets(ctx, name)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("%w: %s", ErrTagNotFound, name)
+		}
+
+		return nil, fmt.Errorf("failed to get tag assets: %w", err)
+	}
+
+	return assets, nil
+}

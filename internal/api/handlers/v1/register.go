@@ -11,6 +11,7 @@ func RegisterRoutes(r gin.IRouter, svc *data.Service) {
 	slog.Info("Registering V1 routes")
 
 	v1 := r.Group("/v1")
+	// Assets
 	v1.GET("/assets", func(ctx *gin.Context) {
 		HandleListAssets(svc, ctx)
 	})
@@ -31,10 +32,6 @@ func RegisterRoutes(r gin.IRouter, svc *data.Service) {
 		HandleCreateAsset(svc, ctx)
 	})
 
-	v1.POST("tags/:name", func(ctx *gin.Context) {
-		HandleCreateTag(svc, ctx)
-	})
-
 	v1.PUT("/assets/:sha256/tags/:name", func(ctx *gin.Context) {
 		HandleTaggingAsset(svc, ctx)
 	})
@@ -42,4 +39,14 @@ func RegisterRoutes(r gin.IRouter, svc *data.Service) {
 	v1.DELETE("/assets/:sha256/tags/:name", func(ctx *gin.Context) {
 		HandleUntaggingAsset(svc, ctx)
 	})
+
+	// Tags
+	v1.GET("tags/:name/assets", func(ctx *gin.Context) {
+		HandleGetTagAssets(svc, ctx)
+	})
+
+	v1.POST("tags/:name", func(ctx *gin.Context) {
+		HandleCreateTag(svc, ctx)
+	})
+
 }

@@ -214,6 +214,25 @@
 								"description": "Creates a new tag in the system.\n\n**Path Parameters:**\n- `tag` (string): Tag name\n\n**Body:**\n- `description` (string): Tag description (optional)\n- `color` (string): Hex color code for UI (optional)"
 							},
 							"response": []
+						},
+						{
+							"name": "Get Tag Assets",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/tags/{{tag_name}}/assets",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"tags",
+										"{{tag_name}}",
+										"assets"
+									]
+								}
+							},
+							"response": []
 						}
 					],
 					"description": "Operations for managing tags"

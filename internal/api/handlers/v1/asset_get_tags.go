@@ -15,14 +15,22 @@ type AssetTagsGetRequest struct {
 	AssetUriParams
 }
 
-func NewGetAssetTagsResponse(tags []*registry.Tag) []string {
+type AssetTagsGetResponse struct {
+	Total int `json:"total"`
+	Tags []string `json:"tags"`
+}
+
+func NewGetAssetTagsResponse(tags []*registry.Tag) *AssetTagsGetResponse {
 	tagsNames := make([]string, len(tags))
 
 	for i, tag := range tags {
 		tagsNames[i] = tag.Name
 	}
 
-	return tagsNames
+	return &AssetTagsGetResponse{
+		Total: len(tagsNames),
+		Tags: tagsNames,
+	}
 }
 
 func HandleGetAssetTags(svc *data.Service, ctx *gin.Context) {
@@ -44,7 +52,7 @@ func HandleGetAssetTags(svc *data.Service, ctx *gin.Context) {
 	// Success response
 	slog.InfoContext(ctx.Request.Context(), "got asset tags successfully",
 		"assetSha256", req.SHA256,
-		"totalTags", len(tags),
+		"total", len(tags),
 	)
 
 	response := NewGetAssetTagsResponse(tags)
