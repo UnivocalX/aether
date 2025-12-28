@@ -14,7 +14,7 @@ import (
 type CreateAssetParams struct {
 	SHA256  string
 	Display string
-	Tags    []uint
+	Tags    []string
 	Extra   map[string]interface{}
 }
 
@@ -78,24 +78,76 @@ func (s *Service) CreateAsset(
 	return result
 }
 
-// handleCreateAssetTags fetches tags and associates them with an asset
-func (s *Service) handleCreateAssetTags(ctx context.Context, asset *registry.Asset, tagIDs []uint) error {
-	if len(tagIDs) == 0 {
+// validateAllTagsFound checks if all requested tags were found and returns an error with missing tag names if not
+func validateAllTagsFound(names []string, tags []*registry.Tag) error {
+	if len(tags) == len(names) {
 		return nil
 	}
 
+	// Build a map of found tags
+	found := make(map[string]bool, len(tags))
+	for _, tag := range tags {
+		found[tag.Name] = true
+	}
+
+	// Find missing tags
+	missing := make([]string, 0)
+	for _, name := range names {
+		if !found[name] {
+			missing = append(missing, name)
+		}
+	}
+
+	return fmt.Errorf("%w: %v", ErrTagNotFound, missing)
+}
+
+// handleCreateAssetTags fetches tags and associates them with an asset
+func (s *Service) handleCreateAssetTags(ctx context.Context, asset *registry.Asset, tagsNames []string) error {
+	slog.Debug("attempting to attach tags to new asset", "total", len(tagsNames))
+	if len(tagsNames) == 0 {
+		return nil
+	}
+
+	// Normalize tag names for comparison
+	normalized := make([]string, 0, len(tagsNames))
+	for _, name := range tagsNames {
+		if n := registry.NormalizeString(name); n != "" {
+			normalized = append(normalized, n)
+		}
+	}
+
 	// Fetch all tags
-	tags, err := s.getTagsByIDs(ctx, tagIDs)
+	tags, err := s.registry.GetTagsByNames(ctx, tagsNames)
 	if err != nil {
 		return err
 	}
 
+	// Check if all tags were found
+	if err := validateAllTagsFound(normalized, tags); err != nil {
+		return err
+	}
+
 	// Associate tags with asset
-	if err := s.registry.DetachTags(ctx, asset, tags); err != nil {
+	if err := s.registry.AttachTags(ctx, asset, tags); err != nil {
 		return fmt.Errorf("failed associating tags with asset: %w", err)
 	}
 
 	return nil
+}
+
+func (s *Service) GetAsset(ctx context.Context, sha256 string) (*registry.Asset, error) {
+	slog.Debug("attempting to get asset", "sha256", sha256)
+	asset, err := s.registry.GetAssetRecord(ctx, sha256)
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("%w: %s", ErrAssetNotFound, sha256)
+		}
+
+		return nil, fmt.Errorf("failed to get asset: %w", err)
+	}
+
+	return asset, nil
 }
 
 func (s *Service) TagAsset(ctx context.Context, sha256 string, tagName string) error {
@@ -111,7 +163,7 @@ func (s *Service) TagAsset(ctx context.Context, sha256 string, tagName string) e
 		return err
 	}
 
-	if err := s.registry.DetachTags(ctx, asset, []*registry.Tag{tag}); err != nil {
+	if err := s.registry.AttachTags(ctx, asset, []*registry.Tag{tag}); err != nil {
 		return fmt.Errorf("failed to tag asset: %w", err)
 	}
 
@@ -131,26 +183,11 @@ func (s *Service) UntagAsset(ctx context.Context, sha256 string, tagName string)
 		return err
 	}
 
-	if err := s.registry.AttachTags(ctx, asset, []*registry.Tag{tag}); err != nil {
+	if err := s.registry.DetachTags(ctx, asset, []*registry.Tag{tag}); err != nil {
 		return fmt.Errorf("failed to untag asset: %w", err)
 	}
 
 	return nil
-}
-
-func (s *Service) GetAsset(ctx context.Context, sha256 string) (*registry.Asset, error) {
-	slog.Debug("attempting to get asset", "sha256", sha256)
-	asset, err := s.registry.GetAssetRecord(ctx, sha256)
-
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, fmt.Errorf("%w: %s", ErrAssetNotFound, sha256)
-		}
-
-		return nil, fmt.Errorf("failed to get asset: %w", err)
-	}
-
-	return asset, nil
 }
 
 func (s *Service) GetAssetTags(ctx context.Context, sha256 string) ([]*registry.Tag, error) {
@@ -187,4 +224,9 @@ func (s *Service) GetAssetPresignedUrl(ctx context.Context, sha256 string) (*reg
 	}
 
 	return s.registry.PutURL(ctx, sha256)
+}
+
+func (s *Service) ListAssets(ctx context.Context, opts ...registry.SearchAssetsOption) ([]*registry.Asset, error) {
+	slog.Debug("attempting to list assets")
+	return s.registry.ListAssetsRecords(ctx, opts...)
 }

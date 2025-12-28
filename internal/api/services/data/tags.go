@@ -42,24 +42,6 @@ func (s *Service) CreateTag(ctx context.Context, params CreateTagParams) *Create
 	return result
 }
 
-// getTagsByIDs fetches tags by their IDs
-func (s *Service) getTagsByIDs(ctx context.Context, tagIDs []uint) ([]*registry.Tag, error) {
-	if len(tagIDs) == 0 {
-		return nil, nil
-	}
-
-	tags := make([]*registry.Tag, 0, len(tagIDs))
-	for _, tagID := range tagIDs {
-		tag, err := s.registry.GetTagRecordById(ctx, tagID)
-		if err != nil {
-			return nil, fmt.Errorf("failed getting tag %d: %w", tagID, err)
-		}
-		tags = append(tags, tag)
-	}
-
-	return tags, nil
-}
-
 func (s *Service) GetTag(ctx context.Context, name string) (*registry.Tag, error) {
 	slog.Debug("attempting to get tag", "name", name)
 	tag, err := s.registry.GetTagRecord(ctx, name)

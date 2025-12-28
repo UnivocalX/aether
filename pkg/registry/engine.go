@@ -308,8 +308,8 @@ func (engine *Engine) UpdateAssetRecord(ctx context.Context, asset *Asset) error
 		First(asset, asset.ID).Error
 }
 
-func (engine *Engine) DetachTags(ctx context.Context, asset *Asset, tags []*Tag) error {
-	slog.Debug("Attempting to update asset tags", "AssetID", asset.ID, "tagCount", len(tags))
+func (engine *Engine) AttachTags(ctx context.Context, asset *Asset, tags []*Tag) error {
+	slog.Debug("Attempting to attach tags to asset", "AssetID", asset.ID, "tagCount", len(tags))
 
 	if len(tags) == 0 {
 		return nil
@@ -328,8 +328,8 @@ func (engine *Engine) DetachTags(ctx context.Context, asset *Asset, tags []*Tag)
 	return nil
 }
 
-func (engine *Engine) AttachTags(ctx context.Context, asset *Asset, tags []*Tag) error {
-	slog.Debug("Attempting to remove asset tags", "AssetID", asset.ID, "tagCount", len(tags))
+func (engine *Engine) DetachTags(ctx context.Context, asset *Asset, tags []*Tag) error {
+	slog.Debug("Attempting to detach tags from asset", "AssetID", asset.ID, "tagCount", len(tags))
 
 	if len(tags) == 0 {
 		return nil
@@ -389,13 +389,85 @@ func (engine *Engine) GetTagRecordById(ctx context.Context, id uint) (*Tag, erro
 	return &tag, nil
 }
 
-// func (engine *Engine) ListAssets(ctx context.Context, opts ...SearchAssetsOption) ([]*Asset, error) {
-// 	slog.Debug("Listing assets", "totalOptions", len(opts))
+// GetTagsByNames fetches multiple tags by their names in a single query
+func (engine *Engine) GetTagsByNames(ctx context.Context, names []string) ([]*Tag, error) {
+	slog.Debug("Getting tags", "total", len(names))
+	if len(names) == 0 {
+		return nil, nil
+	}
 
-// 	query, err := NewSearchAssetsQuery(opts...)
-// 	if err != nil {
-// 		return nil, err
-// 	}
+	// Normalize all names
+	slog.Debug("normalizing tags names")
+	normalized := make([]string, 0, len(names))
+	for _, name := range names {
+		if n := NormalizeString(name); n != "" {
+			normalized = append(normalized, n)
+		}
+	}
 
+	if len(normalized) == 0 {
+		return nil, nil
+	}
 
-// }
+	var tags []*Tag
+	err := engine.db(ctx).
+		Where("name IN ?", normalized).
+		Find(&tags).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return tags, nil
+}
+
+func (engine *Engine) ListAssetsRecords(ctx context.Context, opts ...SearchAssetsOption) ([]*Asset, error) {
+	slog.Debug("Listing assets", "totalOptions", len(opts))
+
+	query, err := NewSearchAssetsQuery(opts...)
+	if err != nil {
+		slog.Debug("failed to build query")
+		return nil, err
+	}
+	slog.Debug("created new query", "query", query)
+
+	db := engine.db(ctx).Where(&Asset{MimeType: query.MimeType, State: query.State})
+
+	// IncludedTags: Filter assets that have ALL specified tags (AND logic)
+	if len(query.IncludedTags) > 0 {
+		db = db.Where("id IN (?)", // Filter main query to only IDs from subquery
+			engine.db(ctx). // Create fresh DB connection for subquery
+					Table("assets").                                             // Query the assets table
+					Select("assets.id").                                         // Return only asset IDs
+					Joins("JOIN asset_tags ON asset_tags.asset_id = assets.id"). // Connect assets to junction table
+					Joins("JOIN tags ON tags.id = asset_tags.tag_id").           // Connect junction table to tags
+					Where("tags.name IN ?", query.IncludedTags).                 // Keep only rows with required tag names
+					Group("assets.id").                                          // Group rows by asset to count tags
+					Having("COUNT(*) = ?", len(query.IncludedTags)),             // Only keep assets with exact tag count (ALL tags present)
+		)
+	}
+
+	// ExcludedTags: Filter out assets that have ANY of these tags
+	if len(query.ExcludedTags) > 0 {
+		db = db.Where("id NOT IN (?)", // Exclude IDs that match subquery
+			engine.db(ctx). // Create fresh DB connection for subquery
+					Table("assets").                                             // Query the assets table
+					Select("assets.id").                                         // Return only asset IDs
+					Joins("JOIN asset_tags ON asset_tags.asset_id = assets.id"). // Connect assets to junction table
+					Joins("JOIN tags ON tags.id = asset_tags.tag_id").           // Connect junction table to tags
+					Where("tags.name IN ?", query.ExcludedTags),                 // Find assets with any excluded tag
+		)
+	}
+
+	// Pagination
+	db = db.Where("id > ?", query.Cursor)
+	db = db.Limit(int(query.Limit))
+
+	// Execute query with preloaded tags
+	var assets []*Asset
+	if err := db.Preload("Tags").Order("id ASC").Find(&assets).Error; err != nil {
+		return nil, err
+	}
+
+	return assets, nil
+}

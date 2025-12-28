@@ -20,7 +20,7 @@ type AssetUriParams struct {
 
 type AssetPostPayload struct {
 	Display string                 `json:"display" binding:"omitempty,max=500"`
-	Tags    []uint                 `json:"tags" binding:"omitempty,dive,gt=0"`
+	Tags    []string               `json:"tags" binding:"omitempty,dive,min=1,max=100"`
 	Extra   map[string]interface{} `json:"extra" binding:"omitempty"`
 }
 
@@ -103,7 +103,7 @@ func handleCreateAssetError(ctx *gin.Context, err error, sha256 string) {
 		dto.BadRequest(ctx, err.Error())
 
 	case errors.Is(err, data.ErrTagNotFound):
-		dto.NotFound(ctx, "One or more tags not found")
+		dto.NotFound(ctx, err.Error())
 
 	case errors.Is(err, data.ErrAssetAlreadyExists):
 		dto.Conflict(ctx, fmt.Sprintf("Asset %s already exists.", sha256))
