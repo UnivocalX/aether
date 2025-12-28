@@ -22,8 +22,8 @@ type TagAssetsGetRequest struct {
 
 type TagAssetsGetResponse struct {
 	Total      int      `json:"total"`
-	Assets     []string `json:"assets"`
 	NextOffset *uint    `json:"next_offset,omitempty"`
+	Assets     []string `json:"assets"`
 }
 
 func NewTagAssetsGetResponse(assets []*registry.Asset, limit uint, offset uint) *TagAssetsGetResponse {

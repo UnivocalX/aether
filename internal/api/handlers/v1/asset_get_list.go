@@ -41,38 +41,38 @@ type AssetListGetResponse struct {
 	Assets     []AssetListItem `json:"assets"`
 }
 
-func NewAssetListGetResponse(assets []*registry.Asset) *AssetListGetResponse {
-	items := make([]AssetListItem, 0, len(assets))
+func NewAssetListGetResponse(assets []*registry.Asset, limit uint) *AssetListGetResponse {
+    items := make([]AssetListItem, 0, len(assets))
 
-	for _, asset := range assets {
-		tags := make([]string, 0, len(asset.Tags))
-		for _, tag := range asset.Tags {
-			tags = append(tags, tag.Name)
-		}
+    for _, asset := range assets {
+        tags := make([]string, 0, len(asset.Tags))
+        for _, tag := range asset.Tags {
+            tags = append(tags, tag.Name)
+        }
 
-		items = append(items, AssetListItem{
-			ID:        asset.ID,
-			Checksum:  asset.Checksum,
-			Display:   asset.Display,
-			Extra:     asset.Extra,
-			MimeType:  asset.MimeType,
-			SizeBytes: asset.SizeBytes,
-			State:     string(asset.State),
-			Tags:      tags,
-		})
-	}
+        items = append(items, AssetListItem{
+            ID:        asset.ID,
+            Checksum:  asset.Checksum,
+            Display:   asset.Display,
+            Extra:     asset.Extra,
+            MimeType:  asset.MimeType,
+            SizeBytes: asset.SizeBytes,
+            State:     string(asset.State),
+            Tags:      tags,
+        })
+    }
 
-	var nextCursor *uint
-	if len(assets) > 0 {
-		lastID := assets[len(assets)-1].ID
-		nextCursor = &lastID
-	}
+    var nextCursor *uint
+    // Only include next_cursor if we got a full page (might be more)
+    if len(assets) == int(limit) && len(assets) > 0 {
+        nextCursor = &assets[len(assets)-1].ID
+    }
 
-	return &AssetListGetResponse{
-		Total:      len(assets),
-		Assets:     items,
-		NextCursor: nextCursor,
-	}
+    return &AssetListGetResponse{
+        Total:      len(assets),
+        Assets:     items,
+        NextCursor: nextCursor,
+    }
 }
 
 func HandleListAssets(svc *data.Service, ctx *gin.Context) {
@@ -96,7 +96,7 @@ func HandleListAssets(svc *data.Service, ctx *gin.Context) {
 		"total", len(assets),
 	)
 
-	response := NewAssetListGetResponse(assets)
+	response := NewAssetListGetResponse(assets, req.Limit)
 	dto.OK(ctx, "Successfully listed assets", response)
 }
 
