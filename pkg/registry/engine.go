@@ -271,7 +271,7 @@ func (engine *Engine) CreateAssetRecord(
 	ctx context.Context,
 	sha256 string,
 	display string,
-	extra map[string]interface{},
+	extra map[string]any,
 ) (*Asset, error) {
 	slog.Debug("Creating asset record", "display", display, "checksum", sha256)
 

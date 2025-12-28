@@ -9,7 +9,7 @@ import (
 // Standard API Response - Minimalist version
 type Response struct {
 	Message string            `json:"message"`
-	Data    interface{}       `json:"data,omitempty"`
+	Data    any       `json:"data,omitempty"`
 	Meta    *ResponseMetadata `json:"meta,omitempty"`
 }
 
@@ -19,7 +19,7 @@ type ResponseMetadata struct {
 }
 
 // Success responses
-func OK(c *gin.Context, message string, data interface{}) {
+func OK(c *gin.Context, message string, data any) {
 	c.JSON(200, Response{
 		Message: message,
 		Data:    data,
@@ -27,7 +27,7 @@ func OK(c *gin.Context, message string, data interface{}) {
 	})
 }
 
-func Created(c *gin.Context, message string, data interface{}) {
+func Created(c *gin.Context, message string, data any) {
 	c.JSON(201, Response{
 		Message: message,
 		Data:    data,
@@ -42,7 +42,7 @@ func NoContent(c *gin.Context, message string) {
 	})
 }
 
-func MultiStatus(c *gin.Context, message string, data interface{}) {
+func MultiStatus(c *gin.Context, message string, data any) {
 	c.JSON(207, Response{
 		Message: message,
 		Data:    data,

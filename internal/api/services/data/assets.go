@@ -15,7 +15,7 @@ type CreateAssetParams struct {
 	SHA256  string
 	Display string
 	Tags    []string
-	Extra   map[string]interface{}
+	Extra   map[string]any
 }
 
 // Service layer result - internal representation

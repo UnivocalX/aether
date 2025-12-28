@@ -76,8 +76,8 @@ func (h *JSONHandler) Handle(ctx context.Context, r slog.Record) error {
 	return err
 }
 
-func (h *JSONHandler) buildFields(r slog.Record) map[string]interface{} {
-	fields := make(map[string]interface{})
+func (h *JSONHandler) buildFields(r slog.Record) map[string]any {
+	fields := make(map[string]any)
 	fields["level"] = r.Level.String()
 	fields["time"] = r.Time.Format("2006-01-02T15:04:05.000Z07:00")
 

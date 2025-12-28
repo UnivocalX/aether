@@ -87,7 +87,7 @@ func (h *CasualHandler) formatFields(record slog.Record) string {
 		return ""
 	}
 
-	fields := make(map[string]interface{}, fieldCount)
+	fields := make(map[string]any, fieldCount)
 	record.Attrs(func(attr slog.Attr) bool {
 		fields[attr.Key] = attr.Value.Any()
 		return true

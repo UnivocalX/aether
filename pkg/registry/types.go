@@ -12,7 +12,7 @@ import (
 
 type Status string
 
-func (p *Status) Scan(value interface{}) error {
+func (p *Status) Scan(value any) error {
 	if value == nil {
 		*p = StatusPending
 		return nil

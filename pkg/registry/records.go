@@ -25,13 +25,13 @@ type Asset struct {
 	Peers           []Peer           `gorm:"many2many:asset_peers;"`
 }
 
-func (a *Asset) SetExtra(extra map[string]interface{}) error {
+func (a *Asset) SetExtra(extra map[string]any) error {
 	if len(extra) == 0 {
 		return fmt.Errorf("cannot set empty extra value")
 	}
 	
 	// Get existing list
-	var extraList []map[string]interface{}
+	var extraList []map[string]any
 	if len(a.Extra) > 0 {
 		json.Unmarshal(a.Extra, &extraList)
 	}

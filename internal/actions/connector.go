@@ -266,7 +266,7 @@ func (con *Connector) DoRequestWithRetry(req *http.Request) (*http.Response, err
 }
 
 // Body preparation
-func prepareBody(body interface{}, contentType string) (io.Reader, string, error) {
+func prepareBody(body any, contentType string) (io.Reader, string, error) {
 	if body == nil {
 		return nil, contentType, nil
 	}
@@ -305,7 +305,7 @@ func (con *Connector) Get(path string) (*http.Response, error) {
 	return con.DoRequestWithRetry(req)
 }
 
-func (con *Connector) Post(path string, body interface{}, contentType string) (*http.Response, error) {
+func (con *Connector) Post(path string, body any, contentType string) (*http.Response, error) {
 	fullURL, err := con.buildURL(path)
 	if err != nil {
 		return nil, err
@@ -328,7 +328,7 @@ func (con *Connector) Post(path string, body interface{}, contentType string) (*
 	return con.DoRequestWithRetry(req)
 }
 
-func (con *Connector) Put(path string, body interface{}, contentType string) (*http.Response, error) {
+func (con *Connector) Put(path string, body any, contentType string) (*http.Response, error) {
 	fullURL, err := con.buildURL(path)
 	if err != nil {
 		return nil, err
@@ -351,7 +351,7 @@ func (con *Connector) Put(path string, body interface{}, contentType string) (*h
 	return con.DoRequestWithRetry(req)
 }
 
-func (con *Connector) Patch(path string, body interface{}, contentType string) (*http.Response, error) {
+func (con *Connector) Patch(path string, body any, contentType string) (*http.Response, error) {
 	fullURL, err := con.buildURL(path)
 	if err != nil {
 		return nil, err

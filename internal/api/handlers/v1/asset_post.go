@@ -21,7 +21,7 @@ type AssetUriParams struct {
 type AssetPostPayload struct {
 	Display string                 `json:"display" binding:"omitempty,max=500"`
 	Tags    []string               `json:"tags" binding:"omitempty,dive,min=1,max=100"`
-	Extra   map[string]interface{} `json:"extra" binding:"omitempty"`
+	Extra   map[string]any `json:"extra" binding:"omitempty"`
 }
 
 type AssetPostRequest struct {
