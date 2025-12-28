@@ -157,7 +157,7 @@
 								"header": [],
 								"body": {
 									"mode": "raw",
-									"raw": "{\n    // \"included_tags\": [\"test\", \"en\", \"local\"],\n    // \"excluded_tags\": [\"production\"]\n    \"cursor\": 39,\n    \"limit\": 10,\n    \"mime_type\": \"\",\n    \"state\": \"pending\"\n}",
+									"raw": "{\n    // \"included_tags\": [\"test\", \"en\", \"local\"],\n    // \"excluded_tags\": [\"production\"]\n    \"cursor\": 0,\n    \"limit\": 10,\n    \"mime_type\": \"\",\n    \"state\": \"pending\"\n}",
 									"options": {
 										"raw": {
 											"language": "json"
