@@ -3,6 +3,7 @@ package registry
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"gorm.io/gorm"
 
@@ -25,17 +26,30 @@ type Asset struct {
 }
 
 func (a *Asset) SetExtra(extra map[string]interface{}) error {
-	if extra == nil {
-		return fmt.Errorf("cant set empty extra value")
+	if len(extra) == 0 {
+		return fmt.Errorf("cannot set empty extra value")
 	}
 	
-	jsonData, err := json.Marshal(extra)
+	// Get existing list
+	var extraList []map[string]interface{}
+	if len(a.Extra) > 0 {
+		json.Unmarshal(a.Extra, &extraList)
+	}
+	
+	// Add date to the new data
+	extra["date"] = time.Now()
+	
+	// Append to list
+	extraList = append(extraList, extra)
+	
+	// Marshal back
+	jsonData, err := json.Marshal(extraList)
 	if err != nil {
 		return fmt.Errorf("failed to marshal extra data: %w", err)
 	}
 
 	a.Extra = datatypes.JSON(jsonData)
-    return nil
+	return nil
 }
 
 type Tag struct {
