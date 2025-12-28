@@ -217,9 +217,21 @@
 						},
 						{
 							"name": "Get Tag Assets",
+							"protocolProfileBehavior": {
+								"disableBodyPruning": true
+							},
 							"request": {
 								"method": "GET",
 								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    // \"limit\": 100,\n    // \"offset\": 0\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
 								"url": {
 									"raw": "{{base_url}}/tags/{{tag_name}}/assets",
 									"host": [

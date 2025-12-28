@@ -10,27 +10,41 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+type TagAssetsGetPayload struct {
+	Limit  uint `json:"limit" binding:"omitempty,min=1,max=1000"`
+	Offset uint `json:"offset" binding:"omitempty,min=0"`
+}
 
 type TagAssetsGetRequest struct {
 	TagUriParams
+	TagAssetsGetPayload
 }
 
 type TagAssetsGetResponse struct {
-	Total int `json:"total"`
-	Assets []string `json:"assets"`
+	Total      int      `json:"total"`
+	Assets     []string `json:"assets"`
+	NextOffset *uint    `json:"next_offset,omitempty"`
 }
 
-func NewTagAssetsGetResponse(assets []*registry.Asset) *TagAssetsGetResponse {
+func NewTagAssetsGetResponse(assets []*registry.Asset, limit uint, offset uint) *TagAssetsGetResponse {
 	assetsChecksums := make([]string, len(assets))
 
 	for i, asset := range assets {
 		assetsChecksums[i] = asset.Checksum
 	}
 
-	return &TagAssetsGetResponse{
-		Total: len(assetsChecksums),
+	response := &TagAssetsGetResponse{
+		Total:  len(assetsChecksums),
 		Assets: assetsChecksums,
 	}
+
+	// Only include NextOffset if we got a full page (meaning there might be more)
+	if len(assets) == int(limit) {
+		NextOffset := offset + uint(len(assets))
+		response.NextOffset = &NextOffset
+	}
+
+	return response
 }
 
 func HandleGetTagAssets(svc *data.Service, ctx *gin.Context) {
@@ -43,7 +57,21 @@ func HandleGetTagAssets(svc *data.Service, ctx *gin.Context) {
 		return
 	}
 
-	assets, err := svc.GetTagAssets(ctx.Request.Context(), req.Name)
+	// Bind JSON payload
+	if err := ctx.ShouldBindJSON(&req.TagAssetsGetPayload); err != nil {
+		slog.ErrorContext(ctx.Request.Context(), "Invalid JSON payload", "error", err.Error())
+		dto.BadRequest(ctx, err.Error())
+		return
+	}
+
+	assets, err := svc.GetTagAssets(
+		ctx.Request.Context(),
+		data.GetTagAssetsParams{
+			Name:   req.Name,
+			Limit:  req.Limit,
+			Offset: req.Offset,
+		},
+	)
 	if err != nil {
 		handleGetTagAssetsError(ctx, err, req.Name)
 		return
@@ -55,7 +83,7 @@ func HandleGetTagAssets(svc *data.Service, ctx *gin.Context) {
 		"total", len(assets),
 	)
 
-	response := NewTagAssetsGetResponse(assets)
+	response := NewTagAssetsGetResponse(assets, req.Limit, req.Offset)
 	dto.OK(ctx, "got tag assets successfully", response)
 }
 

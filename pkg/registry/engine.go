@@ -378,20 +378,25 @@ func (engine *Engine) GetTagRecord(ctx context.Context, name string) (*Tag, erro
 	return &tag, nil
 }
 
-func (engine *Engine) GetTagRecordAssets(ctx context.Context, name string) ([]*Asset, error) {
-	slog.Debug("Getting tag assets", "name", name)
+func (engine *Engine) GetTagRecordAssets(ctx context.Context, name string, limit int, offset int) ([]*Asset, error) {
+    tag, err := engine.GetTagRecord(ctx, name)
+    if err != nil {
+        return nil, err
+    }
 
-	tag, err := engine.GetTagRecord(ctx, name)
-	if err != nil {
-		return nil, err
-	}
+    var assets []*Asset
+    err = engine.db(ctx).
+        Limit(limit).
+        Offset(offset).
+        Model(tag).
+        Association("Assets").
+        Find(&assets)
+    
+    if err != nil {
+        return nil, err
+    }
 
-	var assets []*Asset
-	if err := engine.db(ctx).Model(tag).Association("Assets").Find(&assets); err != nil {
-		return nil, err
-	}
-
-	return assets, nil
+    return assets, nil
 }
 
 func (engine *Engine) GetTagRecordById(ctx context.Context, id uint) (*Tag, error) {
