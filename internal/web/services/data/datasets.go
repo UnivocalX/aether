@@ -14,12 +14,13 @@ import (
 
 func (s *Service) CreateDataset(ctx context.Context, name string, description string) (*registry.DatasetVersion, error) {
 	slog.Debug("attempting to create a new dataset", "name", name)
-	db := s.engine.WithDatabase(ctx)
 
 	var dsv *registry.DatasetVersion
-	err := db.Transaction(func(tx *gorm.DB) error {
+	err := s.engine.DatabaseClient.Transaction(func(tx *gorm.DB) error {
+		engine := s.engine.WithTx(tx)
+
 		// create dataset
-		ds, err := registry.CreateDatasetRecord(tx, name, description)
+		ds, err := engine.CreateDatasetRecord(name, description)
 		if err != nil {
 			// Check PostgreSQL-specific error code
 			var pgErr *pgconn.PgError
@@ -32,7 +33,7 @@ func (s *Service) CreateDataset(ctx context.Context, name string, description st
 		}
 
 		// create first version
-		dsv, err = registry.CreateDatasetVersionRecord(db, ds.Name, "", "")
+		dsv, err = engine.CreateDatasetVersionRecord(ds.Name, "", "")
 		if err != nil {
 			return fmt.Errorf("failed to create a new dataset version for %s: %w", ds.Name, err)
 		}

@@ -68,8 +68,7 @@ func (s *Service) CreateTag(ctx context.Context, params CreateTagParams) *Create
 	slog.Debug("attempting to create tag")
 	result := &CreateTagResult{}
 
-	db := s.engine.WithDatabase(ctx)
-	tag, err := registry.CreateTagRecord(db, params.Name)
+	tag, err := s.engine.CreateTagRecord(params.Name)
 	if err != nil {
 		// Check PostgreSQL-specific error code
 		var pgErr *pgconn.PgError
@@ -90,8 +89,7 @@ func (s *Service) CreateTag(ctx context.Context, params CreateTagParams) *Create
 func (s *Service) GetTag(ctx context.Context, name string) (*registry.Tag, error) {
 	slog.Debug("attempting to get tag", "name", name)
 
-	db := s.engine.WithDatabase(ctx)
-	tag, err := registry.GetTagRecord(db, name)
+	tag, err := s.engine.GetTagRecord(name)
 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -116,8 +114,7 @@ func (s *Service) GetTagAssets(ctx context.Context, params GetTagAssetsParams) (
 		"offset", params.Offset,
 	)
 
-	db := s.engine.WithDatabase(ctx)
-	assets, err := registry.GetTagRecordAssets(db, params.Name, int(params.Limit), int(params.Offset))
+	assets, err := s.engine.GetTagRecordAssets(params.Name, int(params.Limit), int(params.Offset))
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, fmt.Errorf("%w: %s", ErrTagNotFound, params.Name)

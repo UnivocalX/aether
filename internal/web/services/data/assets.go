@@ -33,17 +33,18 @@ func (s *Service) CreateAsset(
 	result := &CreateAssetResult{}
 
 	// Wrap create and tag association in a transaction
-	db := s.engine.WithDatabase(ctx)
-	err := db.Transaction(func(tx *gorm.DB) error {
+	err := s.engine.DatabaseClient.Transaction(func(tx *gorm.DB) error {
+		engine := s.engine.WithTx(tx)
+
 		// Create asset record
-		asset, err := registry.CreateAssetRecord(tx, params.Checksum, params.Display, params.Extra)
+		asset, err := engine.CreateAssetRecord(params.Checksum, params.Display, params.Extra)
 		if err != nil {
 			return err // rollback
 		}
 		slog.Debug("Created new asset", "checksum", params.Checksum)
 
 		// Associate tags
-		if err := handleCreateAssetTags(tx, asset, params.Tags); err != nil {
+		if err := attachTagsToAsset(engine, asset, params.Tags); err != nil {
 			return err // rollback
 		}
 
@@ -79,8 +80,8 @@ func (s *Service) CreateAsset(
 	return result
 }
 
-// handleCreateAssetTags fetches tags and associates them with an asset
-func handleCreateAssetTags(db *gorm.DB, asset *registry.Asset, tagsNames []string) error {
+// attachTagsToAsset fetches tags and associates them with an asset
+func attachTagsToAsset(engine *registry.Engine, asset *registry.Asset, tagsNames []string) error {
 	slog.Debug("attempting to attach tags to new asset", "total", len(tagsNames))
 	if len(tagsNames) == 0 {
 		return nil
@@ -95,7 +96,7 @@ func handleCreateAssetTags(db *gorm.DB, asset *registry.Asset, tagsNames []strin
 	}
 
 	// Fetch all tags
-	tags, err := registry.GetTagsByNames(db, tagsNames)
+	tags, err := engine.GetTagsByNames(normalized)
 	if err != nil {
 		return err
 	}
@@ -106,7 +107,7 @@ func handleCreateAssetTags(db *gorm.DB, asset *registry.Asset, tagsNames []strin
 	}
 
 	// Associate tags with asset
-	if err := registry.AttachTags(db, asset, tags); err != nil {
+	if err := engine.AttachTags(asset, tags); err != nil {
 		return err
 	}
 
@@ -138,8 +139,7 @@ func validateAllTagsFound(names []string, tags []*registry.Tag) error {
 
 func (s *Service) GetAsset(ctx context.Context, checksum string) (*registry.Asset, error) {
 	slog.Debug("attempting to get asset", "checksum", checksum)
-	db := s.engine.WithDatabase(ctx)
-	asset, err := registry.GetAssetRecord(db, checksum)
+	asset, err := s.engine.GetAssetRecord(checksum)
 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -165,8 +165,7 @@ func (s *Service) TagAsset(ctx context.Context, checksum string, tagName string)
 		return err
 	}
 
-	db := s.engine.WithDatabase(ctx)
-	if err := registry.AttachTags(db, asset, []*registry.Tag{tag}); err != nil {
+	if err := s.engine.AttachTags(asset, []*registry.Tag{tag}); err != nil {
 		return fmt.Errorf("failed to tag asset: %w", err)
 	}
 
@@ -186,8 +185,7 @@ func (s *Service) UntagAsset(ctx context.Context, checksum string, tagName strin
 		return err
 	}
 
-	db := s.engine.WithDatabase(ctx)
-	if err := registry.DetachTags(db, asset, []*registry.Tag{tag}); err != nil {
+	if err := s.engine.DetachTags(asset, []*registry.Tag{tag}); err != nil {
 		return fmt.Errorf("failed to untag asset: %w", err)
 	}
 
@@ -197,8 +195,7 @@ func (s *Service) UntagAsset(ctx context.Context, checksum string, tagName strin
 func (s *Service) GetAssetTags(ctx context.Context, checksum string) ([]*registry.Tag, error) {
 	slog.Debug("attempting to get asset tags", "checksum", checksum)
 
-	db := s.engine.WithDatabase(ctx)
-	tags, err := registry.GetAssetRecordTags(db, checksum)
+	tags, err := s.engine.GetAssetRecordTags(checksum)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, fmt.Errorf("%w: %s", ErrAssetNotFound, checksum)
@@ -214,8 +211,7 @@ func (s *Service) GetAssetIngressUrl(ctx context.Context, checksum string) (*reg
 	slog.Debug("attempting to get asset Presigned Url", "checksum", checksum)
 
 	// Check asset status
-	db := s.engine.WithDatabase(ctx)
-	asset, err := registry.GetAssetRecord(db, checksum)
+	asset, err := s.engine.GetAssetRecord(checksum)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, fmt.Errorf("%w: %s", ErrAssetNotFound, checksum)
@@ -235,13 +231,11 @@ func (s *Service) GetAssetIngressUrl(ctx context.Context, checksum string) (*reg
 
 func (s *Service) ListAssets(ctx context.Context, opts ...registry.SearchAssetsOption) ([]*registry.Asset, error) {
 	slog.Debug("attempting to list assets")
-	db := s.engine.WithDatabase(ctx)
-	return registry.ListAssetsRecords(db, opts...)
+	return s.engine.ListAssetsRecords(opts...)
 }
 
 func (s *Service) CreateAssets(ctx context.Context, assets ...*registry.Asset) error {
 	slog.Debug("attempting to create new assets", "total", len(assets))
-	db := s.engine.WithDatabase(ctx)
 
 	// Check if any of the records exist already
 	checksums := make([]string, len(assets))
@@ -249,7 +243,7 @@ func (s *Service) CreateAssets(ctx context.Context, assets ...*registry.Asset) e
 		checksums[i] = record.Checksum
 	}
 
-	existingRecords, err := registry.ListAssetsRecords(db, registry.WithChecksums(checksums...))
+	existingRecords, err := s.engine.ListAssetsRecords(registry.WithChecksums(checksums...))
 	if err != nil {
 		return fmt.Errorf("failed to get records: %w", err)
 	}
@@ -264,5 +258,5 @@ func (s *Service) CreateAssets(ctx context.Context, assets ...*registry.Asset) e
 	}
 
 	// Create records
-	return registry.CreateAssetRecords(db, assets...)
+	return s.engine.CreateAssetRecords(assets...)
 }

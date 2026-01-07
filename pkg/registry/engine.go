@@ -87,17 +87,6 @@ func (engine *Engine) dsn() DSN {
 	return DSN(dsn)
 }
 
-func (e *Engine) WithDatabase(db *gorm.DB) *Engine {
-	if db == nil {
-		return e
-	}
-
-	ne := *e
-	ne.DatabaseClient = db
-
-	return &ne
-}
-
 func (engine *Engine) createS3Client() error {
 	// AWS Client
 	awsCfg, err := config.LoadDefaultConfig(context.TODO())
