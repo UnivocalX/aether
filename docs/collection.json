@@ -91,14 +91,14 @@
 								"method": "GET",
 								"header": [],
 								"url": {
-									"raw": "{{base_url}}/assets/{{asset_hash}}/presignedUrl",
+									"raw": "{{base_url}}/assets/{{asset_hash}}/ingress",
 									"host": [
 										"{{base_url}}"
 									],
 									"path": [
 										"assets",
 										"{{asset_hash}}",
-										"presignedUrl"
+										"ingress"
 									]
 								},
 								"description": "Generates a presigned URL for downloading the asset from storage.\n\n**Path Parameters:**\n- `hash` (string): SHA256 hash of the asset\n\n**Response:**\n- `url` (string): Temporary presigned URL for asset download\n- `expires_at` (string): Expiration timestamp (if applicable)"

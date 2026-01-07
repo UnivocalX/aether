@@ -1,11 +1,11 @@
 package v1
 
 import (
-	"errors"
+	"fmt"
 	"log/slog"
 
-	"github.com/UnivocalX/aether/internal/api/dto"
-	"github.com/UnivocalX/aether/internal/api/services/data"
+	"github.com/UnivocalX/aether/internal/web/api/dto"
+	"github.com/UnivocalX/aether/internal/web/services/data"
 	"github.com/UnivocalX/aether/pkg/registry"
 	"github.com/gin-gonic/gin"
 )
@@ -20,20 +20,20 @@ type TagAssetsGetRequest struct {
 	TagAssetsGetPayload
 }
 
-type TagAssetsGetResponse struct {
+type TagAssetsGetResponseData struct {
 	Total      int      `json:"total"`
 	NextOffset *uint    `json:"next_offset,omitempty"`
 	Assets     []string `json:"assets"`
 }
 
-func NewTagAssetsGetResponse(assets []*registry.Asset, limit uint, offset uint) *TagAssetsGetResponse {
+func NewTagAssetsGetResponseData(assets []*registry.Asset, limit uint, offset uint) *TagAssetsGetResponseData {
 	assetsChecksums := make([]string, len(assets))
 
 	for i, asset := range assets {
 		assetsChecksums[i] = asset.Checksum
 	}
 
-	response := &TagAssetsGetResponse{
+	response := &TagAssetsGetResponseData{
 		Total:  len(assetsChecksums),
 		Assets: assetsChecksums,
 	}
@@ -52,15 +52,21 @@ func HandleGetTagAssets(svc *data.Service, ctx *gin.Context) {
 
 	// Bind URI parameters
 	if err := ctx.ShouldBindUri(&req.TagUriParams); err != nil {
-		slog.ErrorContext(ctx.Request.Context(), "Invalid URI parameters", "error", err.Error())
-		dto.BadRequest(ctx, "Invalid SHA256 in URI")
+		dto.HandleErrorResponse(
+			ctx,
+			"failed to get tag assets",
+			fmt.Errorf("%w: %w", dto.ErrInvalidUri, err),
+		)
 		return
 	}
 
 	// Bind JSON payload
 	if err := ctx.ShouldBindJSON(&req.TagAssetsGetPayload); err != nil {
-		slog.ErrorContext(ctx.Request.Context(), "Invalid JSON payload", "error", err.Error())
-		dto.BadRequest(ctx, err.Error())
+		dto.HandleErrorResponse(
+			ctx,
+			"failed to get tag assets",
+			fmt.Errorf("%w: %w", dto.ErrInvalidPayload, err),
+		)
 		return
 	}
 
@@ -73,33 +79,17 @@ func HandleGetTagAssets(svc *data.Service, ctx *gin.Context) {
 		},
 	)
 	if err != nil {
-		handleGetTagAssetsError(ctx, err, req.Name)
+		dto.HandleErrorResponse(ctx, "failed to get tag assets", err)
 		return
 	}
 
 	// Success response
-	slog.InfoContext(ctx.Request.Context(), "got tags assets successfully",
+	response := dto.NewResponse(ctx, "got tags assets successfully")
+	slog.InfoContext(ctx.Request.Context(), response.Message,
 		"name", req.Name,
 		"total", len(assets),
 	)
 
-	response := NewTagAssetsGetResponse(assets, req.Limit, req.Offset)
-	dto.OK(ctx, "got tag assets successfully", response)
-}
-
-func handleGetTagAssetsError(ctx *gin.Context, err error, name string) {
-	switch {
-	case errors.Is(err, registry.ErrValidation):
-		dto.BadRequest(ctx, err.Error())
-
-	case errors.Is(err, data.ErrTagNotFound):
-		dto.NotFound(ctx, err.Error())
-
-	default:
-		slog.ErrorContext(ctx.Request.Context(), "Failed to get tag assets",
-			"error", err.Error(),
-			"name", name,
-		)
-		dto.InternalError(ctx, "Failed to get tag assets")
-	}
+	response.Data = NewTagAssetsGetResponseData(assets, req.Limit, req.Offset)
+	response.OK(ctx)
 }

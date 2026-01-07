@@ -1,11 +1,11 @@
 package v1
 
 import (
-	"errors"
+	"fmt"
 	"log/slog"
 
-	"github.com/UnivocalX/aether/internal/api/dto"
-	"github.com/UnivocalX/aether/internal/api/services/data"
+	"github.com/UnivocalX/aether/internal/web/api/dto"
+	"github.com/UnivocalX/aether/internal/web/services/data"
 	"github.com/UnivocalX/aether/pkg/registry"
 	"github.com/gin-gonic/gin"
 	"gorm.io/datatypes"
@@ -35,44 +35,10 @@ type AssetListItem struct {
 	Tags      []string       `json:"tags"`
 }
 
-type AssetListGetResponse struct {
-	Total      int             `json:"total"`
-	NextCursor *uint           `json:"next_cursor,omitempty"`
-	Assets     []AssetListItem `json:"assets"`
-}
-
-func NewAssetListGetResponse(assets []*registry.Asset, limit uint) *AssetListGetResponse {
-    items := make([]AssetListItem, 0, len(assets))
-
-    for _, asset := range assets {
-        tags := make([]string, 0, len(asset.Tags))
-        for _, tag := range asset.Tags {
-            tags = append(tags, tag.Name)
-        }
-
-        items = append(items, AssetListItem{
-            ID:        asset.ID,
-            Checksum:  asset.Checksum,
-            Display:   asset.Display,
-            Extra:     asset.Extra,
-            MimeType:  asset.MimeType,
-            SizeBytes: asset.SizeBytes,
-            State:     string(asset.State),
-            Tags:      tags,
-        })
-    }
-
-    var nextCursor *uint
-    // Only include next_cursor if we got a full page (might be more)
-    if len(assets) == int(limit) && len(assets) > 0 {
-        nextCursor = &assets[len(assets)-1].ID
-    }
-
-    return &AssetListGetResponse{
-        Total:      len(assets),
-        Assets:     items,
-        NextCursor: nextCursor,
-    }
+type AssetListGetResponseData struct {
+	Total      int              `json:"total"`
+	NextCursor *uint            `json:"next_cursor,omitempty"`
+	Assets     []*AssetListItem `json:"assets"`
 }
 
 func HandleListAssets(svc *data.Service, ctx *gin.Context) {
@@ -80,24 +46,63 @@ func HandleListAssets(svc *data.Service, ctx *gin.Context) {
 
 	// Bind JSON payload
 	if err := ctx.ShouldBindJSON(&req.AssetListGetPayload); err != nil {
-		slog.ErrorContext(ctx.Request.Context(), "Invalid JSON payload", "error", err.Error())
-		dto.BadRequest(ctx, err.Error())
+		dto.HandleErrorResponse(
+			ctx, 
+			"failed to list assets",
+			fmt.Errorf("%w: %w", dto.ErrInvalidPayload, err),
+		)
 		return
 	}
 
 	assets, err := svc.ListAssets(ctx.Request.Context(), ToSearchOptions(&req)...)
 	if err != nil {
-		handleListAssetsError(ctx, err)
+		dto.HandleErrorResponse(ctx, "failed to list assets", err)
 		return
 	}
 
 	// Success response
-	slog.InfoContext(ctx.Request.Context(), "listed assets successfully",
+	response := dto.NewResponse(ctx, "listed assets successfully")
+	response.Data = NewAssetListGetResponseData(assets, req.Limit)
+
+	slog.InfoContext(ctx.Request.Context(), response.Message,
 		"total", len(assets),
 	)
 
-	response := NewAssetListGetResponse(assets, req.Limit)
-	dto.OK(ctx, "Successfully listed assets", response)
+	response.OK(ctx)
+}
+
+func NewAssetListGetResponseData(assets []*registry.Asset, limit uint) *AssetListGetResponseData {
+	items := make([]*AssetListItem, 0, len(assets))
+
+	for _, asset := range assets {
+		tags := make([]string, 0, len(asset.Tags))
+		for _, tag := range asset.Tags {
+			tags = append(tags, tag.Name)
+		}
+
+		items = append(items, &AssetListItem{
+			ID:        asset.ID,
+			Checksum:  asset.Checksum,
+			Display:   asset.Display,
+			Extra:     asset.Extra,
+			MimeType:  asset.MimeType,
+			SizeBytes: asset.SizeBytes,
+			State:     string(asset.State),
+			Tags:      tags,
+		})
+	}
+
+	var nextCursor *uint
+	// Only include next_cursor if we got a full page (might be more)
+	if len(assets) == int(limit) && len(assets) > 0 {
+		nextCursor = &assets[len(assets)-1].ID
+	}
+
+	return &AssetListGetResponseData{
+		Total:      len(assets),
+		Assets:     items,
+		NextCursor: nextCursor,
+	}
 }
 
 func ToSearchOptions(req *AssetListGetRequest) []registry.SearchAssetsOption {
@@ -118,17 +123,4 @@ func ToSearchOptions(req *AssetListGetRequest) []registry.SearchAssetsOption {
 	addIfSet(len(req.ExcludedTags) > 0, registry.WithExcludedTags(req.ExcludedTags...))
 
 	return opts
-}
-
-func handleListAssetsError(ctx *gin.Context, err error) {
-	switch {
-	case errors.Is(err, registry.ErrValidation):
-		dto.BadRequest(ctx, err.Error())
-
-	default:
-		slog.ErrorContext(ctx.Request.Context(), "Failed to list assets",
-			"error", err.Error(),
-		)
-		dto.InternalError(ctx, "Failed to list assets")
-	}
 }

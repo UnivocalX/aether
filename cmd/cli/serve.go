@@ -7,8 +7,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"github.com/UnivocalX/aether/internal/api"
 	"github.com/UnivocalX/aether/internal/logging"
+	"github.com/UnivocalX/aether/internal/web"
 	"github.com/UnivocalX/aether/pkg/registry"
 )
 
@@ -58,7 +58,7 @@ func startServer(cmd *cobra.Command, args []string) error {
 
 	// Run server
 	port := viper.GetString("server.port")
-	server := api.New(prod, engine)
+	server := web.NewServer(prod, engine)
 	return server.Run(port)
 }
 

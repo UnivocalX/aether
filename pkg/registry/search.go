@@ -16,13 +16,14 @@ type SearchAssetsQuery struct {
 	State        Status
 	IncludedTags []string
 	ExcludedTags []string
+	CheckSums    []string
 }
 
 func (q SearchAssetsQuery) String() string {
-    return fmt.Sprintf(
-        "SearchAssetsQuery{Cursor: %d, Limit: %d, MimeType: %q, State: %v, IncludedTags: %v, ExcludedTags: %v}",
-        q.Cursor, q.Limit, q.MimeType, q.State, q.IncludedTags, q.ExcludedTags,
-    )
+	return fmt.Sprintf(
+		"SearchAssetsQuery{Cursor: %d, Limit: %d, MimeType: %q, State: %v, IncludedTags: %v, ExcludedTags: %v}",
+		q.Cursor, q.Limit, q.MimeType, q.State, q.IncludedTags, q.ExcludedTags,
+	)
 }
 
 type SearchAssetsOption func(*SearchAssetsQuery) error
@@ -74,7 +75,7 @@ func WithIncludedTags(tags ...string) SearchAssetsOption {
 
 		cleaned := make([]string, 0, len(tags))
 		seen := make(map[string]bool)
-		
+
 		for _, tag := range tags {
 			normalized := NormalizeString(tag)
 			if normalized == "" {
@@ -98,10 +99,10 @@ func WithExcludedTags(tags ...string) SearchAssetsOption {
 		if len(tags) == 0 {
 			return fmt.Errorf("at least one excluded tag must be provided")
 		}
-		
+
 		cleaned := make([]string, 0, len(tags))
 		seen := make(map[string]bool)
-		
+
 		for _, tag := range tags {
 			normalized := NormalizeString(tag)
 			if normalized == "" {
@@ -116,6 +117,17 @@ func WithExcludedTags(tags ...string) SearchAssetsOption {
 			cleaned = append(cleaned, normalized)
 		}
 		q.ExcludedTags = cleaned
+		return nil
+	}
+}
+
+func WithChecksums(checksums ...string) SearchAssetsOption {
+	return func(q *SearchAssetsQuery) error {
+		if len(checksums) == 0 {
+			return fmt.Errorf("at least one excluded checksum must be provided")
+		}
+
+		q.CheckSums = checksums
 		return nil
 	}
 }

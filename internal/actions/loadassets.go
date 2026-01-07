@@ -8,8 +8,8 @@ import (
 	"os"
 	"path/filepath"
 
-	v1 "github.com/UnivocalX/aether/internal/api/handlers/v1"
 	"github.com/UnivocalX/aether/internal/helpers"
+	v1 "github.com/UnivocalX/aether/internal/web/api/handlers/v1"
 )
 
 type LoadAssets struct {
@@ -67,7 +67,7 @@ func (load *LoadAssets) processFiles(files []string) []*v1.AssetPostRequest {
 		requests = append(
 			requests, &v1.AssetPostRequest{
 				AssetUriParams: v1.AssetUriParams{
-					SHA256: sha256,
+					Checksum: sha256,
 				},
 				AssetPostPayload: v1.AssetPostPayload{
 					Display: filepath.Base(path),

@@ -5,11 +5,11 @@ import (
 )
 
 type Service struct {
-	registry *registry.Engine
+	engine *registry.Engine
 }
 
-func NewService(registry *registry.Engine) *Service {
+func NewService(engine *registry.Engine) *Service {
 	return &Service{
-		registry: registry,
+		engine: engine,
 	}
 }

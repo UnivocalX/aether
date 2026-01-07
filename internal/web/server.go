@@ -1,4 +1,4 @@
-package api
+package web
 
 import (
 	"log/slog"
@@ -7,9 +7,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	v1 "github.com/UnivocalX/aether/internal/api/handlers/v1"
-	"github.com/UnivocalX/aether/internal/api/middleware"
-	"github.com/UnivocalX/aether/internal/api/services/data"
+	v1 "github.com/UnivocalX/aether/internal/web/api/handlers/v1"
+	"github.com/UnivocalX/aether/internal/web/middleware"
+	"github.com/UnivocalX/aether/internal/web/services/data"
 	"github.com/UnivocalX/aether/pkg/registry"
 )
 
@@ -35,7 +35,7 @@ func (s *Server) Run(port string) error {
 	return httpServer.ListenAndServe()
 }
 
-func New(prod bool, engine *registry.Engine) *Server {
+func NewServer(prod bool, engine *registry.Engine) *Server {
 	// set gin mode
 	if prod {
 		gin.SetMode(gin.ReleaseMode)
@@ -45,6 +45,7 @@ func New(prod bool, engine *registry.Engine) *Server {
 	router := gin.New()
 	router.Use(gin.Recovery())
 	router.Use(middleware.Logger())
+	router.MaxMultipartMemory = 8 << 20  // 8 MiB
 
 	server := &Server{
 		Registry: engine,

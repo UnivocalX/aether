@@ -100,30 +100,18 @@ func (dv *DatasetVersion) BeforeSave(tx *gorm.DB) error {
 
 // BeforeCreate hook for DatasetVersion - auto-increment version number
 func (dv *DatasetVersion) BeforeCreate(tx *gorm.DB) error {
-	if dv.Number == 0 {
-		var maxVersion int
-		err := tx.Model(&DatasetVersion{}).
-			Where("dataset_id = ?", dv.DatasetID).
-			Select("COALESCE(MAX(number), 0)").
-			Scan(&maxVersion).Error
-		if err != nil {
-			return err
-		}
-		dv.Number = maxVersion + 1
-	}
-	return nil
-}
+	var maxVersion int
+	err := tx.Model(&DatasetVersion{}).
+		Where("dataset_id = ?", dv.DatasetID).
+		Select("COALESCE(MAX(number), 0)").
+		Scan(&maxVersion).Error
 
-// Utility methods
-func (d *Dataset) LatestVersion(tx *gorm.DB) (*DatasetVersion, error) {
-	var latestVersion DatasetVersion
-	err := tx.Where("dataset_id = ?", d.ID).
-		Order("version_number DESC").
-		First(&latestVersion).Error
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return &latestVersion, nil
+	
+	dv.Number = maxVersion + 1
+	return nil
 }
 
 // BeforeCreate hook for Peer
