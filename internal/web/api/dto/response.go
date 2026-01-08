@@ -3,6 +3,7 @@ package dto
 import (
 	"errors"
 	"log/slog"
+	"net/http"
 	"time"
 
 	dataService "github.com/UnivocalX/aether/internal/web/services/data"
@@ -10,17 +11,30 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Standard API Response - Minimalist version
+// Standard API response
 type Response struct {
-	Message string
-	Data    any
-	Error   error
-	Meta    *ResponseMetadata `json:"meta,omitempty"`
+	Message string            `json:"message"`
+	Data    any               `json:"data,omitempty"`
+	Meta    *ResponseMetadata `json:"meta,omitempty,inline"`
 }
 
+// Error response wrapper
+type ErrorDetails struct {
+	Message error           `json:"message"`
+	Details *map[string]any `json:",inline"`
+}
+
+type ErrorResponse struct {
+	Message string            `json:"message"`
+	Error   *ErrorDetails     `json:"error"`
+	Meta    *ResponseMetadata `json:"meta,omitempty,inline"`
+}
+
+// Metadata attached to every response
 type ResponseMetadata struct {
 	Timestamp string `json:"timestamp"`
 	RequestID string `json:"request_id,omitempty"`
+	Path      string `json:"path,omitempty"`
 }
 
 func NewResponse(c *gin.Context, msg string) *Response {
@@ -30,95 +44,67 @@ func NewResponse(c *gin.Context, msg string) *Response {
 	}
 }
 
-// Helper to build meta information
+func NewErrorResponse(c *gin.Context, msg string, err error) *ErrorResponse {
+	return &ErrorResponse{
+		Message: msg,
+		Error: &ErrorDetails{
+			Message: err,
+		},
+		Meta: buildMeta(c),
+	}
+}
+
 func buildMeta(c *gin.Context) *ResponseMetadata {
 	return &ResponseMetadata{
 		Timestamp: time.Now().UTC().Format(time.RFC3339),
 		RequestID: c.GetString("requestId"),
+		Path:      c.Request.URL.Path,
 	}
 }
 
-// Success responses
-func (response *Response) OK(c *gin.Context) {
-	c.JSON(200, response)
-}
+func (r *Response) OK(c *gin.Context)                 { c.JSON(http.StatusOK, r) }
+func (r *Response) Created(c *gin.Context)            { c.JSON(http.StatusCreated, r) }
+func (r *Response) NoContent(c *gin.Context)          { c.Status(http.StatusNoContent) }
+func (r *Response) MultiStatus(c *gin.Context)        { c.JSON(http.StatusMultiStatus, r) }
+func (r *ErrorResponse) BadRequest(c *gin.Context)    { c.JSON(http.StatusBadRequest, r) }
+func (r *ErrorResponse) Unauthorized(c *gin.Context)  { c.JSON(http.StatusUnauthorized, r) }
+func (r *ErrorResponse) Forbidden(c *gin.Context)     { c.JSON(http.StatusForbidden, r) }
+func (r *ErrorResponse) NotFound(c *gin.Context)      { c.JSON(http.StatusNotFound, r) }
+func (r *ErrorResponse) Conflict(c *gin.Context)      { c.JSON(http.StatusConflict, r) }
+func (r *ErrorResponse) InternalError(c *gin.Context) { c.JSON(http.StatusInternalServerError, r) }
 
-func (response *Response) Created(c *gin.Context) {
-	c.JSON(201, response)
-}
+func HandleErrorResponse(ctx *gin.Context, msg string, err error) {
+    response := NewErrorResponse(ctx, msg, err)
 
-func (response *Response) NoContent(c *gin.Context) {
-	c.JSON(204, response)
-}
+    slog.ErrorContext(
+        ctx.Request.Context(),
+        err.Error(),
+        "error", err,
+    )
 
-func (response *Response) MultiStatus(c *gin.Context) {
-	c.JSON(207, response)
-}
+    var assetsExistError dataService.AssetsExistsError
+    switch {
+    case errors.Is(err, ErrInvalidUri),
+        errors.Is(err, ErrInvalidPayload),
+        errors.Is(err, registry.ErrValidation):
+        response.BadRequest(ctx)
 
-// Error responses - Use HTTP status codes instead of success field
-func (response *Response) BadRequest(c *gin.Context) {
-	c.JSON(400, response)
-}
+    case errors.Is(err, dataService.ErrAssetNotFound),
+        errors.Is(err, dataService.ErrTagNotFound):
+        response.NotFound(ctx)
 
-func (response *Response) Unauthorized(c *gin.Context) {
-	c.JSON(401, response)
-}
+    case errors.As(err, &assetsExistError):
+        response.Error.Details = &map[string]any{
+            "checksums": assetsExistError.Checksums,
+        }
+        response.Conflict(ctx)
 
-func (response *Response) Forbidden(c *gin.Context) {
-	c.JSON(403, response)
-}
+    case errors.Is(err, dataService.ErrAssetAlreadyExists),
+        errors.Is(err, dataService.ErrTagAlreadyExists),
+        errors.Is(err, dataService.ErrDatasetAlreadyExists):
+        response.Conflict(ctx)
 
-func (response *Response) NotFound(c *gin.Context) {
-	c.JSON(404, response)
-}
-
-func (response *Response) InternalError(c *gin.Context) {
-	c.JSON(500, response)
-}
-
-func (response *Response) Conflict(c *gin.Context) {
-	c.JSON(409, response)
-}
-
-func HandleErrorResponse(ctx *gin.Context, msg string, err error, data ...any) {
-	response := NewResponse(ctx, msg)
-	response.Error = err
-	response.Data = data
-
-	slog.ErrorContext(ctx.Request.Context(), response.Message, "error", response.Error)
-
-	switch {
-	case errors.Is(response.Error, ErrInvalidUri):
-		response.BadRequest(ctx)
-
-	case errors.Is(response.Error, ErrInvalidPayload):
-		response.BadRequest(ctx)
-
-	case errors.Is(response.Error, registry.ErrValidation):
-		response.BadRequest(ctx)
-
-	case errors.Is(response.Error, dataService.ErrAssetNotFound):
-		response.NotFound(ctx)
-
-	case errors.Is(response.Error, dataService.ErrTagNotFound):
-		response.NotFound(ctx)
-
-	case errors.Is(err, dataService.ErrAssetIsReady):
-		response.Conflict(ctx)
-
-	case errors.Is(err, dataService.ErrAssetAlreadyExists):
-		response.Conflict(ctx)
-
-	case errors.Is(err, dataService.ErrTagAlreadyExists):
-		response.Conflict(ctx)
-
-	case errors.As(err, &dataService.ErrAssetsExists{}):
-		response.Conflict(ctx)
-
-	case errors.Is(err, dataService.ErrDatasetAlreadyExists):
-		response.Conflict(ctx)
-
-	default:
-		response.InternalError(ctx)
-	}
+    default:
+        response.InternalError(ctx)
+    }
 }

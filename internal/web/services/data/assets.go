@@ -249,12 +249,12 @@ func (s *Service) CreateAssets(ctx context.Context, assets ...*registry.Asset) e
 	}
 
 	if len(existingRecords) > 0 {
-		existingChecksums := make([]string, len(assets))
+		existingChecksums := make([]*string, len(assets))
 		for i, record := range existingRecords {
-			existingChecksums[i] = record.Checksum
+			existingChecksums[i] = &record.Checksum
 		}
 
-		return ErrAssetsExists{Checksums: existingChecksums}
+		return AssetsExistsError{Checksums: existingChecksums}
 	}
 
 	// Create records

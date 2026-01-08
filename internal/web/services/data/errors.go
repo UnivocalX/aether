@@ -14,11 +14,10 @@ var (
 	ErrAssetIsReady         = errors.New("reuploading a ready asset is not allowed")
 )
 
-type ErrAssetsExists struct {
-	Checksums []string
+type AssetsExistsError struct {
+	Checksums []*string
 }
 
-func (e ErrAssetsExists) Error() string {
-	return fmt.Sprintf("%d assets already exist", len(e.Checksums))
+func (e AssetsExistsError) Error() string {
+	return fmt.Sprintf("%d asset(s) already exist", len(e.Checksums))
 }
-
