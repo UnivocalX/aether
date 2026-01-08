@@ -48,8 +48,8 @@ func HandleGetAsset(svc *data.Service, ctx *gin.Context) {
 	}
 
 	// Success response
-	response := dto.NewResponse(ctx, "got asset successfully")
-	response.Data = NewAssetGetResponseData(asset)
+	data := NewAssetGetResponseData(asset)
+	response := dto.NewResponse(ctx, "got asset successfully").WithData(data)
 
 	slog.InfoContext(ctx.Request.Context(), response.Message,
 		"checksum", asset.Checksum,

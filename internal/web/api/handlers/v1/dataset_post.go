@@ -47,14 +47,14 @@ func HandleCreateDataset(svc *data.Service, ctx *gin.Context) {
 		dto.HandleErrorResponse(ctx, "failed to create dataset", err)
 		return
 	}
-
-	response := dto.NewResponse(ctx, "dataset created successfully")
-	response.Data = &DatasetPostResponseData{
+	
+	data := &DatasetPostResponseData{
 		ID: dsv.DatasetID, 
 		Name: dsv.Dataset.Name, 
 		Description: 
 		dsv.Dataset.Description,
 	}
+	response := dto.NewResponse(ctx, "dataset created successfully").WithData(data)
 
 	// Success response
 	slog.InfoContext(ctx.Request.Context(), response.Message,

@@ -61,8 +61,8 @@ func HandleListAssets(svc *data.Service, ctx *gin.Context) {
 	}
 
 	// Success response
-	response := dto.NewResponse(ctx, "listed assets successfully")
-	response.Data = NewAssetListGetResponseData(assets, req.Limit)
+	data := NewAssetListGetResponseData(assets, req.Limit)
+	response := dto.NewResponse(ctx, "listed assets successfully").WithData(data)
 
 	slog.InfoContext(ctx.Request.Context(), response.Message,
 		"total", len(assets),

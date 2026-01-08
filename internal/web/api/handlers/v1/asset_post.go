@@ -41,7 +41,7 @@ func HandleCreateAsset(svc *data.Service, ctx *gin.Context) {
 	// Bind URI parameters
 	if err := ctx.ShouldBindUri(&req.AssetUriParams); err != nil {
 		dto.HandleErrorResponse(
-			ctx, 
+			ctx,
 			"failed to create new asset",
 			fmt.Errorf("%w: %w", dto.ErrInvalidUri, err),
 		)
@@ -73,8 +73,8 @@ func HandleCreateAsset(svc *data.Service, ctx *gin.Context) {
 	}
 
 	// Success response
-	response := dto.NewResponse(ctx, "asset created successfully")
-	response.Data = NewAssetPostResponseData(result)
+	data := NewAssetPostResponseData(result)
+	response := dto.NewResponse(ctx, "asset created successfully").WithData(data)
 
 	slog.InfoContext(ctx.Request.Context(), response.Message,
 		"checksum", result.Asset.Checksum,

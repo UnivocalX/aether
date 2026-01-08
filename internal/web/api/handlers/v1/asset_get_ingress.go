@@ -50,8 +50,8 @@ func HandleGetIngressUrl(svc *data.Service, ctx *gin.Context) {
 	}
 
 	// Success response
-	response := dto.NewResponse(ctx, "got asset ingress url successfully")
-	response.Data = NewIngressUrlGetResponseData(presignedUrl)
+	data := NewIngressUrlGetResponseData(presignedUrl)
+	response := dto.NewResponse(ctx, "got asset ingress url successfully").WithData(data)
 	
 	slog.InfoContext(ctx.Request.Context(), response.Message,
 		"checksum", req.Checksum,

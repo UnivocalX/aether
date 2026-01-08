@@ -54,6 +54,11 @@ func NewErrorResponse(c *gin.Context, msg string, err error) *ErrorResponse {
 	}
 }
 
+func (r *Response) WithData(data any) *Response {
+	r.Data = data
+	return r
+}
+
 func buildMeta(c *gin.Context) *ResponseMetadata {
 	return &ResponseMetadata{
 		Timestamp: time.Now().UTC().Format(time.RFC3339),

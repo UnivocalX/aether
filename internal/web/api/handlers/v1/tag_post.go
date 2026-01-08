@@ -43,8 +43,8 @@ func HandleCreateTag(svc *data.Service, ctx *gin.Context) {
 	}
 
 	// Success response
-	response := dto.NewResponse(ctx, "tag created successfully")
-	response.Data = &TagPostResponseData{ID: result.Tag.ID, Name: result.Tag.Name}
+	data := &TagPostResponseData{ID: result.Tag.ID, Name: result.Tag.Name}
+	response := dto.NewResponse(ctx, "tag created successfully").WithData(data)
 
 	slog.InfoContext(ctx.Request.Context(), response.Message,
 		"tagName", result.Tag.Name,

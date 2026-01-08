@@ -84,12 +84,12 @@ func HandleGetTagAssets(svc *data.Service, ctx *gin.Context) {
 	}
 
 	// Success response
-	response := dto.NewResponse(ctx, "got tags assets successfully")
+	data := NewTagAssetsGetResponseData(assets, req.Limit, req.Offset)
+	response := dto.NewResponse(ctx, "got tags assets successfully").WithData(data)
+
 	slog.InfoContext(ctx.Request.Context(), response.Message,
 		"name", req.Name,
 		"total", len(assets),
 	)
-
-	response.Data = NewTagAssetsGetResponseData(assets, req.Limit, req.Offset)
 	response.OK(ctx)
 }

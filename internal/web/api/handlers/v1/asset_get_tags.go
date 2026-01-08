@@ -39,8 +39,8 @@ func HandleGetAssetTags(svc *data.Service, ctx *gin.Context) {
 	}
 
 	// Success response
-	response := dto.NewResponse(ctx, "got asset tags successfully")
-	response.Data = NewGetAssetTagsResponseData(tags)
+	data := NewGetAssetTagsResponseData(tags)
+	response := dto.NewResponse(ctx, "got asset tags successfully").WithData(data)
 
 	slog.InfoContext(ctx.Request.Context(), response.Message,
 		"checksum", req.Checksum,
