@@ -24,7 +24,7 @@ func (engine *Engine) GetAssetRecord(sha256 string) (*Asset, error) {
 
 	var asset Asset
 	if err := engine.DatabaseClient.Where("checksum = ?", normalizedSha256).First(&asset).Error; err != nil {
-		return nil, fmt.Errorf("failed to get asset %s: %w", sha256, err)
+		return nil, fmt.Errorf("get asset %q: %w", sha256, err)
 	}
 
 	return &asset, nil
@@ -40,7 +40,7 @@ func (engine *Engine) GetAssetRecordTags(sha256 string) ([]*Tag, error) {
 
 	var tags []*Tag
 	if err := engine.DatabaseClient.Model(asset).Association("Tags").Find(&tags); err != nil {
-		return nil, fmt.Errorf("failed to get asset %s tags: %w", sha256, err)
+		return nil, fmt.Errorf("get asset %q tags: %w", sha256, err)
 	}
 
 	return tags, nil
@@ -50,24 +50,10 @@ func (engine *Engine) CreateAssetRecord(asset *Asset) error {
 	slog.Debug("Creating asset record", "display", asset.Display, "checksum", asset.Checksum)
 
 	if err := engine.DatabaseClient.Create(asset).Error; err != nil {
-		return fmt.Errorf("failed creating new asset %s: %w", asset.Checksum, err)
+		return fmt.Errorf("create asset %q: %w", asset.Checksum, err)
 	}
 
 	return nil
-}
-
-func (engine *Engine) UpdateAssetRecord(asset *Asset) error {
-	if asset.Checksum == "" {
-		return fmt.Errorf("asset checksum is required for update")
-	}
-
-	result := engine.DatabaseClient.Model(asset).Updates(asset)
-	if result.Error != nil {
-		return fmt.Errorf("failed to update asset %s: %w", asset.Checksum, result.Error)
-	}
-
-	// Reload to get fresh timestamps, but reuse the same pointer
-	return engine.DatabaseClient.First(asset, asset.ID).Error
 }
 
 func (engine *Engine) AttachTags(asset *Asset, tags []*Tag) error {
@@ -79,7 +65,7 @@ func (engine *Engine) AttachTags(asset *Asset, tags []*Tag) error {
 
 	// Append all tags at once
 	if err := engine.DatabaseClient.Model(asset).Association("Tags").Append(tags); err != nil {
-		return fmt.Errorf("failed to attach tags to asset %s: %w", asset.Checksum, err)
+		return fmt.Errorf("attach tags %q: %w", asset.Checksum, err)
 	}
 
 	// Single reload for all tags
@@ -99,7 +85,7 @@ func (engine *Engine) DetachTags(asset *Asset, tags []*Tag) error {
 
 	// Delete all tags at once
 	if err := engine.DatabaseClient.Model(asset).Association("Tags").Delete(tags); err != nil {
-		return fmt.Errorf("failed to detach tags from asset %s: %w", asset.Checksum, err)
+		return fmt.Errorf("detach tags %q: %w", asset.Checksum, err)
 	}
 
 	// Single reload for all tags
@@ -115,7 +101,7 @@ func (engine *Engine) CreateTagRecord(name string) (*Tag, error) {
 
 	tag := &Tag{Name: name}
 	if err := engine.DatabaseClient.Create(tag).Error; err != nil {
-		return nil, fmt.Errorf("failed to create tag %s: %w", name, err)
+		return nil, fmt.Errorf("create tag %q: %w", name, err)
 	}
 
 	return tag, nil
@@ -127,7 +113,7 @@ func (engine *Engine) GetTagRecord(name string) (*Tag, error) {
 
 	var tag Tag
 	if err := engine.DatabaseClient.Where("name = ?", normalizedName).First(&tag).Error; err != nil {
-		return nil, fmt.Errorf("failed to get tag %s: %w", name, err)
+		return nil, fmt.Errorf("get tag %q: %w", name, err)
 	}
 
 	return &tag, nil
@@ -141,7 +127,7 @@ func (engine *Engine) GetTagRecordAssets(name string, limit int, offset int) ([]
 
 	var assets []*Asset
 	if err := engine.DatabaseClient.Limit(limit).Offset(offset).Model(tag).Association("Assets").Find(&assets); err != nil {
-		return nil, fmt.Errorf("failed to get tag %s assets: %w", name, err)
+		return nil, fmt.Errorf("get tag %q assets: %w", name, err)
 	}
 
 	return assets, nil
@@ -152,7 +138,7 @@ func (engine *Engine) GetTagRecordById(id uint) (*Tag, error) {
 
 	var tag Tag
 	if err := engine.DatabaseClient.First(&tag, id).Error; err != nil {
-		return nil, fmt.Errorf("failed to get tag by ID %d: %w", id, err)
+		return nil, fmt.Errorf("get tag by ID %d: %w", id, err)
 	}
 
 	return &tag, nil
@@ -255,7 +241,18 @@ func (engine *Engine) CreateDatasetRecord(name string, description string) (*Dat
 
 	ds := &Dataset{Name: name, Description: description}
 	if err := engine.DatabaseClient.Create(ds).Error; err != nil {
-		return nil, fmt.Errorf("failed to create dataset: %w", err)
+		return nil, fmt.Errorf("create dataset %q: %w", name, err)
+	}
+
+	return ds, nil
+}
+
+func (engine *Engine) GetDatasetRecord(name string) (*Dataset, error) {
+	slog.Debug("getting dataset", "dataset", name)
+	
+	var ds *Dataset
+	if err := engine.DatabaseClient.Where(&Dataset{Name: name}).First(ds).Error; err != nil {
+		return nil, fmt.Errorf("get dataset %q: %w", name, err)
 	}
 
 	return ds, nil
@@ -265,20 +262,20 @@ func (engine *Engine) CreateDatasetVersionRecord(datasetName string, description
 	slog.Debug("creating a new dataset version", "dataset", datasetName)
 
 	// Get dataset
-	var ds Dataset
-	if err := engine.DatabaseClient.Where(&Dataset{Name: datasetName}).First(&ds).Error; err != nil {
-		return nil, fmt.Errorf("failed to get dataset %s: %w", datasetName, err)
+	ds, err := engine.GetDatasetRecord(datasetName)
+	if err != nil {
+		return nil, err
 	}
 
 	// Create version
 	dsv := &DatasetVersion{
 		DatasetID:   ds.ID,
-		Dataset:     ds,
+		Dataset:     *ds,
 		Description: description,
 	}
 
 	if err := engine.DatabaseClient.Create(dsv).Error; err != nil {
-		return nil, fmt.Errorf("failed to create a new version for %s, %w", datasetName, err)
+		return nil, fmt.Errorf("create dataset version %q: %w", datasetName, err)
 	}
 
 	return dsv, nil
@@ -287,7 +284,7 @@ func (engine *Engine) CreateDatasetVersionRecord(datasetName string, description
 func (engine *Engine) CreateAssetRecords(assets ...*Asset) error {
 	slog.Debug("creating new assets", "total", len(assets))
 	if err := engine.DatabaseClient.Create(assets).Error; err != nil {
-		return fmt.Errorf("registry: failed creating assets, %w", err)
+		return fmt.Errorf("create assets: %w", err)
 	}
 
 	return nil
