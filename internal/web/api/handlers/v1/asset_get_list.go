@@ -11,17 +11,13 @@ import (
 	"gorm.io/datatypes"
 )
 
-type AssetListGetPayload struct {
+type ListAssetsPayload struct {
 	Cursor       uint     `json:"cursor" binding:"omitempty,gte=0"`
 	Limit        uint     `json:"limit" binding:"omitempty,gte=1,lte=1000"`
 	MimeType     string   `json:"mime_type" binding:"omitempty"`
 	State        string   `json:"state" binding:"omitempty,oneof=pending active archived"`
 	IncludedTags []string `json:"included_tags" binding:"omitempty,dive,min=1,max=100"`
 	ExcludedTags []string `json:"excluded_tags" binding:"omitempty,dive,min=1,max=100"`
-}
-
-type AssetListGetRequest struct {
-	AssetListGetPayload
 }
 
 type AssetListItem struct {
@@ -35,33 +31,33 @@ type AssetListItem struct {
 	Tags      []string       `json:"tags"`
 }
 
-type AssetListGetResponseData struct {
+type AssetsResponseData struct {
 	Total      int              `json:"total"`
 	NextCursor *uint            `json:"next_cursor,omitempty"`
 	Assets     []*AssetListItem `json:"assets"`
 }
 
-func HandleListAssets(svc *data.Service, ctx *gin.Context) {
-	var req AssetListGetRequest
+func ListAssetsHandler(svc *data.Service, ctx *gin.Context) {
+	var payload ListAssetsPayload
 
 	// Bind JSON payload
-	if err := ctx.ShouldBindJSON(&req.AssetListGetPayload); err != nil {
+	if err := ctx.ShouldBindJSON(&payload); err != nil {
 		dto.HandleErrorResponse(
-			ctx, 
+			ctx,
 			"failed to list assets",
-			fmt.Errorf("%w: %w", dto.ErrInvalidPayload, err),
+			fmt.Errorf("%w, %w", dto.ErrInvalidPayload, err),
 		)
 		return
 	}
 
-	assets, err := svc.ListAssets(ctx.Request.Context(), ToSearchOptions(&req)...)
+	assets, err := svc.ListAssets(ctx.Request.Context(), ToSearchOptions(&payload)...)
 	if err != nil {
 		dto.HandleErrorResponse(ctx, "failed to list assets", err)
 		return
 	}
 
 	// Success response
-	data := NewAssetListGetResponseData(assets, req.Limit)
+	data := NewAssetsResponseData(assets, payload.Limit)
 	response := dto.NewResponse(ctx, "listed assets successfully").WithData(data)
 
 	slog.InfoContext(ctx.Request.Context(), response.Message,
@@ -71,7 +67,7 @@ func HandleListAssets(svc *data.Service, ctx *gin.Context) {
 	response.OK(ctx)
 }
 
-func NewAssetListGetResponseData(assets []*registry.Asset, limit uint) *AssetListGetResponseData {
+func NewAssetsResponseData(assets []*registry.Asset, limit uint) *AssetsResponseData {
 	items := make([]*AssetListItem, 0, len(assets))
 
 	for _, asset := range assets {
@@ -98,14 +94,14 @@ func NewAssetListGetResponseData(assets []*registry.Asset, limit uint) *AssetLis
 		nextCursor = &assets[len(assets)-1].ID
 	}
 
-	return &AssetListGetResponseData{
+	return &AssetsResponseData{
 		Total:      len(assets),
 		Assets:     items,
 		NextCursor: nextCursor,
 	}
 }
 
-func ToSearchOptions(req *AssetListGetRequest) []registry.SearchAssetsOption {
+func ToSearchOptions(req *ListAssetsPayload) []registry.SearchAssetsOption {
 	var opts []registry.SearchAssetsOption
 
 	// Helper to conditionally add options

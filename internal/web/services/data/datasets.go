@@ -25,7 +25,7 @@ func (s *Service) CreateDataset(ctx context.Context, name string, description st
 			// Check PostgreSQL-specific error code
 			var pgErr *pgconn.PgError
 			if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-				slog.Error("dataset already exist", "name", name)
+				slog.Debug("dataset already exist", "name", name)
 				return fmt.Errorf("%w: %s", ErrDatasetAlreadyExists, name)
 			} else {
 				return fmt.Errorf("failed to create dataset: %w", err)
@@ -33,9 +33,9 @@ func (s *Service) CreateDataset(ctx context.Context, name string, description st
 		}
 
 		// create first version
-		dsv, err = engine.CreateDatasetVersionRecord(ds.Name, "", "")
+		dsv, err = engine.CreateDatasetVersionRecord(ds.Name, description)
 		if err != nil {
-			return fmt.Errorf("failed to create a new dataset version for %s: %w", ds.Name, err)
+			return err
 		}
 
 		return nil

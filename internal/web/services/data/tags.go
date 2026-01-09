@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/UnivocalX/aether/pkg/registry"
-	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/gorm"
 )
 
@@ -17,15 +16,6 @@ const (
 	MaxLimit     = 1000
 	MinLimit     = 1
 )
-
-type CreateTagParams struct {
-	Name string
-}
-
-type CreateTagResult struct {
-	Tag *registry.Tag
-	Err error
-}
 
 type GetTagAssetsParams struct {
 	Name   string
@@ -64,26 +54,24 @@ type GetTagAssetsResult struct {
 	Assets []*registry.Asset
 }
 
-func (s *Service) CreateTag(ctx context.Context, params CreateTagParams) *CreateTagResult {
+func (s *Service) AddTag(ctx context.Context, name string) (*registry.Tag, error) {
 	slog.Debug("attempting to create tag")
-	result := &CreateTagResult{}
 
-	tag, err := s.engine.CreateTagRecord(params.Name)
+	// Try to fetch existing tag
+	tag, err := s.engine.GetTagRecord(name)
 	if err != nil {
-		// Check PostgreSQL-specific error code
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-			slog.Error("tag already exist", "name", params.Name)
-			result.Err = fmt.Errorf("%w: %s", ErrTagAlreadyExists, params.Name)
-			return result
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
 		}
 
-		result.Err = err
-		return result
+		// Tag not found → create it
+		tag, err = s.engine.SaveTagRecord(name)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	result.Tag = tag
-	return result
+	return tag, nil
 }
 
 func (s *Service) GetTag(ctx context.Context, name string) (*registry.Tag, error) {

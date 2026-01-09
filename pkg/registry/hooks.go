@@ -17,7 +17,7 @@ var (
 
 // ValidateString checks if a name matches the allowed pattern
 func ValidateString(name string) bool {
-	var ValidNamePattern = regexp.MustCompile(`^[a-z0-9/.:_-]+$`)
+	var ValidNamePattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$`)
 	return ValidNamePattern.MatchString(name)
 }
 
@@ -89,15 +89,6 @@ func (d *Dataset) BeforeSave(tx *gorm.DB) error {
 	return nil
 }
 
-// BeforeSave hook for DatasetVersion name normalization
-func (dv *DatasetVersion) BeforeSave(tx *gorm.DB) error {
-	dv.Display = NormalizeString(dv.Display)
-	if !ValidateString(dv.Display) {
-		return fmt.Errorf("%w: dataset version name contains invalid characters", ErrValidation)
-	}
-	return nil
-}
-
 // BeforeCreate hook for DatasetVersion - auto-increment version number
 func (dv *DatasetVersion) BeforeCreate(tx *gorm.DB) error {
 	var maxVersion int
@@ -109,7 +100,7 @@ func (dv *DatasetVersion) BeforeCreate(tx *gorm.DB) error {
 	if err != nil {
 		return err
 	}
-	
+
 	dv.Number = maxVersion + 1
 	return nil
 }

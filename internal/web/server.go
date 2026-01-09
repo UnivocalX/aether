@@ -13,6 +13,11 @@ import (
 	"github.com/UnivocalX/aether/pkg/registry"
 )
 
+var (
+	MaxMultipartMemory int64 = 8 << 20 // 8 MiB
+	MaxRequestSize     int64 = 4 << 20 // 4 MiB for JSON batch requests
+)
+
 type Server struct {
 	Registry *registry.Engine
 	Router   *gin.Engine
@@ -45,7 +50,8 @@ func NewServer(prod bool, engine *registry.Engine) *Server {
 	router := gin.New()
 	router.Use(gin.Recovery())
 	router.Use(middleware.Logger())
-	router.MaxMultipartMemory = 8 << 20  // 8 MiB
+	router.Use(middleware.MaxRequestSizeLimit(MaxRequestSize))
+	router.MaxMultipartMemory = MaxMultipartMemory
 
 	server := &Server{
 		Registry: engine,
@@ -60,7 +66,7 @@ func NewServer(prod bool, engine *registry.Engine) *Server {
 }
 
 func (s *Server) RegisterRoutes() {
-	slog.Debug("Registering API routes")
+	slog.Info("Registering API routes")
 	api := s.Router.Group("/api")
 	v1.RegisterRoutes(api, s.DataSvc)
 }

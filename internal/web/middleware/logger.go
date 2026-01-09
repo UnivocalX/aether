@@ -67,7 +67,7 @@ func Logger() gin.HandlerFunc {
 		}
 
 		// Start (Debug so it can be silenced in production)
-		slog.LogAttrs(c.Request.Context(), slog.LevelDebug, "HTTP Request Started", common...)
+		slog.LogAttrs(c.Request.Context(), slog.LevelInfo, "HTTP Request Started", common...)
 
 		// Let handlers run
 		c.Next()

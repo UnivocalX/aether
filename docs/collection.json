@@ -14,18 +14,16 @@
 					"name": "Assets",
 					"item": [
 						{
-							"name": "Create Asset",
+							"name": "List Assets",
+							"protocolProfileBehavior": {
+								"disableBodyPruning": true
+							},
 							"request": {
-								"method": "POST",
-								"header": [
-									{
-										"key": "Content-Type",
-										"value": "application/json"
-									}
-								],
+								"method": "GET",
+								"header": [],
 								"body": {
 									"mode": "raw",
-									"raw": "{\n    \"display\": \"{{$randomFileName}}\",\n    \"tags\": [\"test\", \"en\"],\n    \"extra\": {\n        \"user\": \"{{$randomUserName}}\",\n        \"department\": \"engineering\",\n        \"project\": \"alpha\"\n    }\n}",
+									"raw": "{\n    // \"included_tags\": [\"test\", \"en\", \"local\"],\n    // \"excluded_tags\": [\"production\"]\n    \"cursor\": 0,\n    \"limit\": 1000,\n    \"mime_type\": \"\",\n    \"state\": \"pending\"\n}",
 									"options": {
 										"raw": {
 											"language": "json"
@@ -33,16 +31,14 @@
 									}
 								},
 								"url": {
-									"raw": "{{base_url}}/assets/{{asset_hash}}",
+									"raw": "{{base_url}}/assets",
 									"host": [
 										"{{base_url}}"
 									],
 									"path": [
-										"assets",
-										"{{asset_hash}}"
+										"assets"
 									]
-								},
-								"description": "Creates a new asset record with the specified hash. The hash should be a SHA256 hash of the asset content.\n\n**Path Parameters:**\n- `hash` (string): SHA256 hash of the asset\n\n**Body:**\n- `display` (string): Human-readable display name\n- `tags` (array): Array of tag IDs to associate\n- `extra` (object): Additional metadata (optional)"
+								}
 							},
 							"response": []
 						},
@@ -86,7 +82,7 @@
 							"response": []
 						},
 						{
-							"name": "Get Asset Presigned URL",
+							"name": "Get Asset Ingress Url",
 							"request": {
 								"method": "GET",
 								"header": [],
@@ -106,7 +102,67 @@
 							"response": []
 						},
 						{
-							"name": "Add Tag to Asset",
+							"name": "Create Asset",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"display\": \"{{$randomFileName}}\",\n    \"tags\": [\"test\", \"en\"],\n    \"extra\": {\n        \"user\": \"{{$randomUserName}}\",\n        \"department\": \"engineering\",\n        \"project\": \"alpha\"\n    }\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/assets/{{asset_hash}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"assets",
+										"{{asset_hash}}"
+									]
+								},
+								"description": "Creates a new asset record with the specified hash. The hash should be a SHA256 hash of the asset content.\n\n**Path Parameters:**\n- `hash` (string): SHA256 hash of the asset\n\n**Body:**\n- `display` (string): Human-readable display name\n- `tags` (array): Array of tag IDs to associate\n- `extra` (object): Additional metadata (optional)"
+							},
+							"response": []
+						},
+						{
+							"name": "Create Asset Batch",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"assets\": [\n        {\n            \"checksum\": \"3504c78272dbe360dc1edae220c197ce8209b7c6c2df342fa9419a983f17eed4\",\n            \"display\": \"asset-0000\",\n            \"extra\": {\n                \"env\": \"test\",\n                \"source\": \"local\"\n            }\n        },\n        {\n            \"checksum\": \"3504c78272dbe360dc1edae220c197ce8209b7c6c2df342fa9419a983f17ee14\",\n            \"display\": \"asset-0000\",\n            \"extra\": {\n                \"env\": \"test\",\n                \"source\": \"local\"\n            }\n        },\n        {\n            \"checksum\": \"3504c78272dbe360dc1edae220c197ce8209b7c6c2df342fa9419a983f17ee24\",\n            \"display\": \"asset-0001\",\n            \"extra\": {\n                \"env\": \"test\",\n                \"source\": \"local\"\n            }\n        },\n        {\n            \"checksum\": \"3504c78272dbe360dc1edae220c197ce8209b7c6c2df342fa9419a983f17ee34\",\n            \"display\": \"asset-0002\",\n            \"extra\": {\n                \"env\": \"test\",\n                \"source\": \"local\"\n            }\n        },\n        {\n            \"checksum\": \"3504c78272dbe360dc1edae220c197ce8209b7c6c2df342fa9419a983f17ee44\",\n            \"display\": \"asset-0003\",\n            \"extra\": {\n                \"env\": \"test\",\n                \"source\": \"local\"\n            }\n        }\n    ]\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/assets/",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"assets",
+										""
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Tag Asset",
 							"request": {
 								"method": "PUT",
 								"header": [],
@@ -127,7 +183,7 @@
 							"response": []
 						},
 						{
-							"name": "Remove Tag from Asset",
+							"name": "Untag Asset",
 							"request": {
 								"method": "DELETE",
 								"header": [],
@@ -144,35 +200,6 @@
 									]
 								},
 								"description": "Removes a tag association from an asset.\n\n**Path Parameters:**\n- `hash` (string): SHA256 hash of the asset\n- `tag` (string): Tag name to remove"
-							},
-							"response": []
-						},
-						{
-							"name": "List Assets",
-							"protocolProfileBehavior": {
-								"disableBodyPruning": true
-							},
-							"request": {
-								"method": "GET",
-								"header": [],
-								"body": {
-									"mode": "raw",
-									"raw": "{\n    // \"included_tags\": [\"test\", \"en\", \"local\"],\n    // \"excluded_tags\": [\"production\"]\n    \"cursor\": 0,\n    \"limit\": 10,\n    \"mime_type\": \"\",\n    \"state\": \"pending\"\n}",
-									"options": {
-										"raw": {
-											"language": "json"
-										}
-									}
-								},
-								"url": {
-									"raw": "{{base_url}}/assets",
-									"host": [
-										"{{base_url}}"
-									],
-									"path": [
-										"assets"
-									]
-								}
 							},
 							"response": []
 						}
@@ -248,6 +275,41 @@
 						}
 					],
 					"description": "Operations for managing tags"
+				},
+				{
+					"name": "Datasets",
+					"item": [
+						{
+							"name": "Create Dataset",
+							"protocolProfileBehavior": {
+								"disableBodyPruning": true
+							},
+							"request": {
+								"method": "GET",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"description\": \"demo dataset\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{base_url}}/datasets/{{dataset_name}}",
+									"host": [
+										"{{base_url}}"
+									],
+									"path": [
+										"datasets",
+										"{{dataset_name}}"
+									]
+								}
+							},
+							"response": []
+						}
+					]
 				}
 			]
 		}
@@ -283,6 +345,10 @@
 		{
 			"key": "tag_name",
 			"value": "production"
+		},
+		{
+			"key": "dataset_name",
+			"value": ""
 		}
 	]
 }

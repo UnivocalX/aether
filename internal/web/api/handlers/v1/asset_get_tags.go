@@ -10,54 +10,50 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type AssetTagsGetRequest struct {
-	AssetUriParams
-}
-
-type AssetTagsGetResponseData struct {
+type AssetTagsResponseData struct {
 	Total int      `json:"total"`
 	Tags  []string `json:"tags"`
 }
 
-func HandleGetAssetTags(svc *data.Service, ctx *gin.Context) {
-	var req AssetTagsGetRequest
+func ListAssetTagsHandler(svc *data.Service, ctx *gin.Context) {
+	var uri dto.AssetUri
 
 	// Bind URI parameters
-	if err := ctx.ShouldBindUri(&req.AssetUriParams); err != nil {
+	if err := ctx.ShouldBindUri(&uri); err != nil {
 		dto.HandleErrorResponse(
 			ctx,
 			"failed to get asset tags",
-			fmt.Errorf("%w: %w", dto.ErrInvalidUri, err),
+			fmt.Errorf("%w, %w", dto.ErrInvalidUri, err),
 		)
 		return
 	}
 
-	tags, err := svc.GetAssetTags(ctx.Request.Context(), req.Checksum)
+	tags, err := svc.GetAssetTags(ctx.Request.Context(), uri.AssetChecksum)
 	if err != nil {
 		dto.HandleErrorResponse(ctx, "failed to get asset tags", err)
 		return
 	}
 
 	// Success response
-	data := NewGetAssetTagsResponseData(tags)
+	data := NewAssetTagsResponseData(tags)
 	response := dto.NewResponse(ctx, "got asset tags successfully").WithData(data)
 
 	slog.InfoContext(ctx.Request.Context(), response.Message,
-		"checksum", req.Checksum,
+		"checksum", uri.AssetChecksum,
 		"total", len(tags),
 	)
-	
+
 	response.OK(ctx)
 }
 
-func NewGetAssetTagsResponseData(tags []*registry.Tag) *AssetTagsGetResponseData {
+func NewAssetTagsResponseData(tags []*registry.Tag) *AssetTagsResponseData {
 	tagsNames := make([]string, len(tags))
 
 	for i, tag := range tags {
 		tagsNames[i] = tag.Name
 	}
 
-	return &AssetTagsGetResponseData{
+	return &AssetTagsResponseData{
 		Total: len(tagsNames),
 		Tags:  tagsNames,
 	}

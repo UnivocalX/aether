@@ -9,50 +9,51 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type DatasetUriParams struct {
-	Name string `uri:"name" binding:"required,len=100"`
+type CreateDatasetPayload struct {
+	Description string `json:"description" binding:"omitempty,max=1000"`
 }
 
-type DatasetPostPayload struct {
-	description string `uri:"description" binding:"omitempty,max=1000"`
+type CreateDatasetResponseData struct {
+	ID          uint   `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
 }
 
-type DatasetPostRequest struct {
-	DatasetUriParams
-	DatasetPostPayload
-}
-
-type DatasetPostResponseData struct {
-	ID          uint
-	Name        string
-	Description string
-}
-
-func HandleCreateDataset(svc *data.Service, ctx *gin.Context) {
-	var req DatasetPostRequest
+func CreateDatasetHandler(svc *data.Service, ctx *gin.Context) {
+	var uri dto.DatasetUri
+	var payload CreateDatasetPayload
 
 	// Bind URI parameters
-	if err := ctx.ShouldBindUri(&req.DatasetUriParams); err != nil {
+	if err := ctx.ShouldBindUri(&uri); err != nil {
 		slog.ErrorContext(ctx.Request.Context(), "Invalid URI parameters", "error", err.Error())
 		dto.HandleErrorResponse(
 			ctx,
 			"failed to create dataset",
-			fmt.Errorf("%w: %w", dto.ErrInvalidUri, err),
+			fmt.Errorf("%w, %w", dto.ErrInvalidUri, err),
 		)
 		return
 	}
 
-	dsv, err := svc.CreateDataset(ctx.Request.Context(), req.Name, req.description)
+	// Bind JSON payload
+	if err := ctx.ShouldBindJSON(&payload); err != nil {
+		dto.HandleErrorResponse(
+			ctx,
+			"failed to create dataset",
+			fmt.Errorf("%w, %w", dto.ErrInvalidPayload, err),
+		)
+		return
+	}
+
+	dsv, err := svc.CreateDataset(ctx.Request.Context(), uri.DatasetName, payload.Description)
 	if err != nil {
 		dto.HandleErrorResponse(ctx, "failed to create dataset", err)
 		return
 	}
-	
-	data := &DatasetPostResponseData{
-		ID: dsv.DatasetID, 
-		Name: dsv.Dataset.Name, 
-		Description: 
-		dsv.Dataset.Description,
+
+	data := &CreateDatasetResponseData{
+		ID:          dsv.DatasetID,
+		Name:        dsv.Dataset.Name,
+		Description: dsv.Dataset.Description,
 	}
 	response := dto.NewResponse(ctx, "dataset created successfully").WithData(data)
 

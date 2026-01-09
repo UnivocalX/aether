@@ -110,12 +110,12 @@ func (engine *Engine) DetachTags(asset *Asset, tags []*Tag) error {
 	return nil
 }
 
-func (engine *Engine) CreateTagRecord(name string) (*Tag, error) {
-	slog.Debug(fmt.Sprintf("Creating tag: %s", name))
+func (engine *Engine) SaveTagRecord(name string) (*Tag, error) {
+	slog.Debug("Saving tag", "name", name)
 
 	tag := &Tag{Name: name}
-	if err := engine.DatabaseClient.Create(tag).Error; err != nil {
-		return nil, fmt.Errorf("failed to create tag %s: %w", name, err)
+	if err := engine.DatabaseClient.Save(tag).Error; err != nil {
+		return nil, fmt.Errorf("failed to save tag %s: %w", name, err)
 	}
 
 	return tag, nil
@@ -261,8 +261,8 @@ func (engine *Engine) CreateDatasetRecord(name string, description string) (*Dat
 	return ds, nil
 }
 
-func (engine *Engine) CreateDatasetVersionRecord(datasetName string, versionDisplay string, description string) (*DatasetVersion, error) {
-	slog.Debug("creating a new dataset version", "dataset", datasetName, "versionDisplay", versionDisplay)
+func (engine *Engine) CreateDatasetVersionRecord(datasetName string, description string) (*DatasetVersion, error) {
+	slog.Debug("creating a new dataset version", "dataset", datasetName)
 
 	// Get dataset
 	var ds Dataset
@@ -274,12 +274,11 @@ func (engine *Engine) CreateDatasetVersionRecord(datasetName string, versionDisp
 	dsv := &DatasetVersion{
 		DatasetID:   ds.ID,
 		Dataset:     ds,
-		Display:     versionDisplay,
 		Description: description,
 	}
 
 	if err := engine.DatabaseClient.Create(dsv).Error; err != nil {
-		return nil, fmt.Errorf("failed to create a new dataset version for %s: %w", datasetName, err)
+		return nil, fmt.Errorf("failed to create a new version for %s, %w", datasetName, err)
 	}
 
 	return dsv, nil
@@ -288,7 +287,7 @@ func (engine *Engine) CreateDatasetVersionRecord(datasetName string, versionDisp
 func (engine *Engine) CreateAssetRecords(assets ...*Asset) error {
 	slog.Debug("creating new assets", "total", len(assets))
 	if err := engine.DatabaseClient.Create(assets).Error; err != nil {
-		return fmt.Errorf("failed creating assets: %w", err)
+		return fmt.Errorf("registry: failed creating assets, %w", err)
 	}
 
 	return nil

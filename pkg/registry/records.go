@@ -61,14 +61,13 @@ func (d *Dataset) LatestVersion(tx *gorm.DB) (*DatasetVersion, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &latestVersion, nil
 }
 
 type DatasetVersion struct {
 	gorm.Model
-	Number      int    `gorm:"not null;uniqueIndex:idx_dataset_number"`
-	Display     string `gorm:"size:100"`
+	Number      int `gorm:"not null;uniqueIndex:idx_dataset_number"`
 	Description string
 	DatasetID   uint `gorm:"not null;uniqueIndex:idx_dataset_number;index"`
 	Dataset     Dataset

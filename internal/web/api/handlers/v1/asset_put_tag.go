@@ -9,29 +9,20 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type AssetPutTagUriParams struct {
-	AssetUriParams
-	TagUriParams
-}
-
-type AssetPutTaggingRequest struct {
-	AssetPutTagUriParams
-}
-
-func HandleTaggingAsset(svc *data.Service, ctx *gin.Context) {
-	var req AssetPutTaggingRequest
+func TagAssetHandler(svc *data.Service, ctx *gin.Context) {
+	var uri dto.AssetTagUri
 
 	// Bind URI parameters
-	if err := ctx.ShouldBindUri(&req.AssetPutTagUriParams); err != nil {
+	if err := ctx.ShouldBindUri(&uri); err != nil {
 		dto.HandleErrorResponse(
-			ctx, 
+			ctx,
 			"failed to tag asset",
-			fmt.Errorf("%w: %w", dto.ErrInvalidUri, err),
+			fmt.Errorf("%w, %w", dto.ErrInvalidUri, err),
 		)
 		return
 	}
 
-	if err := svc.TagAsset(ctx.Request.Context(), req.Checksum, req.Name); err != nil {
+	if err := svc.TagAsset(ctx.Request.Context(), uri.AssetChecksum, uri.TagName); err != nil {
 		dto.HandleErrorResponse(ctx, "failed to tag asset", err)
 		return
 	}
@@ -40,8 +31,8 @@ func HandleTaggingAsset(svc *data.Service, ctx *gin.Context) {
 	response := dto.NewResponse(ctx, "tag asset successfully")
 
 	slog.InfoContext(ctx.Request.Context(), response.Message,
-		"tagName", req.Name,
-		"Checksum", req.Checksum,
+		"tagName", uri.TagName,
+		"Checksum", uri.AssetChecksum,
 	)
 
 	response.NoContent(ctx)
