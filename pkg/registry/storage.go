@@ -24,18 +24,18 @@ func (engine *Engine) PingStorage(ctx context.Context) error {
 }
 
 // IngressKey generates the ingress S3 key path
-func (engine *Engine) IngressKey(sha256 string) string {
-	return path.Join(engine.prefix, "ingress", sha256)
+func (engine *Engine) IngressKey(checksum string) string {
+	return path.Join(engine.prefix, "ingress", checksum)
 }
 
 // CuratedKey generates the curated S3 key path
-func (engine *Engine) CuratedKey(sha256 string) string {
-	return path.Join(engine.prefix, "curated", sha256)
+func (engine *Engine) CuratedKey(checksum string) string {
+	return path.Join(engine.prefix, "curated", checksum)
 }
 
 // IngressURL generates a presigned URL for upload (default expiry)
-func (engine *Engine) IngressURL(ctx context.Context, sha256 string) (*PresignedUrl, error) {
-	return engine.IngressUrlExpire(ctx, sha256, DEFAULT_PRESIGN_TTL)
+func (engine *Engine) IngressURL(ctx context.Context, checksum string) (*PresignedUrl, error) {
+	return engine.IngressUrlExpire(ctx, checksum, DEFAULT_PRESIGN_TTL)
 }
 
 func (engine *Engine) IngressUrlExpire(ctx context.Context, sha256 string, expire time.Duration) (*PresignedUrl, error) {
@@ -53,7 +53,7 @@ func (engine *Engine) IngressUrlExpire(ctx context.Context, sha256 string, expir
 	)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate presign put url: %w", err)
+		return nil, fmt.Errorf("failed to generate presigned put url: %w", err)
 	}
 
 	now := time.Now()

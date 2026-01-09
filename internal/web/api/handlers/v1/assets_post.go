@@ -2,6 +2,7 @@ package v1
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/UnivocalX/aether/internal/web/api/dto"
 	"github.com/UnivocalX/aether/internal/web/services/data"
@@ -21,14 +22,18 @@ type AssetBatchPostRequest struct {
 	AssetBatchPostPayload
 }
 
+type AssetBatchResponseData struct {
+	Assets []*AssetPostResponseData
+}
+
 func HandleCreateAssetBatch(svc *data.Service, ctx *gin.Context) {
 	var req AssetBatchPostRequest
 
 	// Bind JSON payload
 	if err := ctx.ShouldBindJSON(&req.AssetBatchPostPayload); err != nil {
 		dto.HandleErrorResponse(
-			ctx, 
-			"failed to create assets batch", 
+			ctx,
+			"failed to execute batch",
 			fmt.Errorf("%w: %w", dto.ErrInvalidUri, err),
 		)
 		return
@@ -39,17 +44,49 @@ func HandleCreateAssetBatch(svc *data.Service, ctx *gin.Context) {
 	if err != nil {
 		dto.HandleErrorResponse(
 			ctx,
-			"failed to create assets batch",
+			"failed to execute batch",
 			fmt.Errorf("%w: %w", dto.ErrInvalidPayload, err),
 		)
 		return
 	}
 
-	if err := svc.CreateAssets(ctx.Request.Context(), assets...); err != nil {
-		dto.HandleErrorResponse(ctx, "failed to create assets batch", err, )
-		return 
+	ingressUrls, err := svc.CreateAssets(ctx.Request.Context(), assets...)
+	if err != nil {
+		dto.HandleErrorResponse(ctx, "failed to execute batch", err)
+		return
 	}
 
+	// Success response
+	data := NewAssetBatchResponseData(assets, ingressUrls)
+	response := dto.NewResponse(ctx, "successfully executed batch").WithData(data)
+	slog.InfoContext(ctx.Request.Context(), response.Message,
+		"total", len(assets),
+	)
+
+	response.Created(ctx)
+}
+
+func NewAssetBatchResponseData(
+	assets []*registry.Asset,
+	urls []*registry.PresignedUrl,
+) *AssetBatchResponseData {
+
+	// Build lookup map: checksum → presigned URL
+	urlMap := make(map[string]*registry.PresignedUrl, len(urls))
+	for _, u := range urls {
+		urlMap[u.Checksum] = u
+	}
+
+	// Build response assets
+	dataAssets := make([]*AssetPostResponseData, len(assets))
+	for i, a := range assets {
+		uploadURL := urlMap[a.Checksum] // may be nil if no URL exists
+		dataAssets[i] = NewAssetPostResponseData(a, uploadURL)
+	}
+
+	return &AssetBatchResponseData{
+		Assets: dataAssets,
+	}
 }
 
 func batchRequestToRecords(req *AssetBatchPostRequest) ([]*registry.Asset, error) {

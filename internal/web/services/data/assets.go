@@ -7,7 +7,6 @@ import (
 	"log/slog"
 
 	"github.com/UnivocalX/aether/pkg/registry"
-	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/gorm"
 )
 
@@ -24,60 +23,74 @@ type CreateAssetResult struct {
 	UploadURL *registry.PresignedUrl
 	Err       error
 }
-
 func (s *Service) CreateAsset(
-	ctx context.Context,
-	params CreateAssetParams,
+    ctx context.Context,
+    params CreateAssetParams,
 ) *CreateAssetResult {
-	slog.Debug("Attempting to create asset")
-	result := &CreateAssetResult{}
+    slog.Debug("Attempting to create asset")
 
-	// Wrap create and tag association in a transaction
-	err := s.engine.DatabaseClient.Transaction(func(tx *gorm.DB) error {
-		engine := s.engine.WithTx(tx)
+    result := &CreateAssetResult{}
 
-		// Create asset record
-		asset, err := engine.CreateAssetRecord(params.Checksum, params.Display, params.Extra)
-		if err != nil {
-			return err // rollback
-		}
-		slog.Debug("Created new asset", "checksum", params.Checksum)
+    // Build the asset OUTSIDE the transaction
+    asset := &registry.Asset{
+        Checksum: params.Checksum,
+        Display:  params.Display,
+    }
 
-		// Associate tags
-		if err := attachTagsToAsset(engine, asset, params.Tags); err != nil {
-			return err // rollback
-		}
+    if params.Extra != nil {
+        if err := asset.SetExtra(params.Extra); err != nil {
+            result.Err = err
+            return result
+        }
+    }
 
-		result.Asset = asset
-		return nil // commit
-	})
+    // Run DB operations in a transaction
+    err := s.engine.DatabaseClient.Transaction(func(tx *gorm.DB) error {
+        engine := s.engine.WithTx(tx)
 
-	// handle errors
-	if err != nil {
-		slog.Debug("Create asset transaction failed", "checksum", params.Checksum, "error", err.Error())
+        // Create asset record
+        if err := engine.CreateAssetRecord(asset); err != nil {
+            return err
+        }
+        slog.Debug("Created new asset", "checksum", params.Checksum)
 
-		// Check PostgreSQL-specific error code
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-			slog.Error("asset already exist", "checksum", params.Checksum)
-			result.Err = fmt.Errorf("%w: %s", ErrAssetAlreadyExists, params.Checksum)
-			return result
-		}
+        // Associate tags
+        if err := attachTagsToAsset(engine, asset, params.Tags); err != nil {
+            return err
+        }
 
-		slog.Debug("unexpected error occurred", "error", err)
-		result.Err = err
-		return result
-	}
+        return nil
+    })
 
-	// Generate put URL (outside transaction - S3 operation)
-	url, err := s.engine.IngressURL(ctx, params.Checksum)
-	if err != nil {
-		result.Err = fmt.Errorf("failed generating presigned URL: %w", err)
-		return result
-	}
+    // Handle transaction errors
+    if err != nil {
+        slog.Debug("Create asset transaction failed",
+            "checksum", params.Checksum,
+            "error", err.Error(),
+        )
 
-	result.UploadURL = url
-	return result
+        if IsUniqueConstraintError(err) {
+            slog.Error("Asset already exists", "checksum", params.Checksum)
+            result.Err = fmt.Errorf("%w: %s", ErrAssetAlreadyExists, params.Checksum)
+            return result
+        }
+
+        result.Err = err
+        return result
+    }
+
+    // Only set after successful commit
+    result.Asset = asset
+
+    // Generate presigned PUT URL (outside transaction)
+    url, err := s.engine.IngressURL(ctx, params.Checksum)
+    if err != nil {
+        result.Err = fmt.Errorf("failed generating presigned URL: %w", err)
+        return result
+    }
+
+    result.UploadURL = url
+    return result
 }
 
 // attachTagsToAsset fetches tags and associates them with an asset
@@ -234,29 +247,50 @@ func (s *Service) ListAssets(ctx context.Context, opts ...registry.SearchAssetsO
 	return s.engine.ListAssetsRecords(opts...)
 }
 
-func (s *Service) CreateAssets(ctx context.Context, assets ...*registry.Asset) error {
+func (s *Service) CreateAssets(ctx context.Context, assets ...*registry.Asset) ([]*registry.PresignedUrl, error) {
 	slog.Debug("attempting to create new assets", "total", len(assets))
 
-	// Check if any of the records exist already
-	checksums := make([]string, len(assets))
-	for i, record := range assets {
-		checksums[i] = record.Checksum
-	}
+	// Try to create
+	if err := s.engine.CreateAssetRecords(assets...); err != nil {
+		// If duplicate error → fetch existing records and return them
+		if IsUniqueConstraintError(err) {
+			checksums := make([]string, len(assets))
+			for i, a := range assets {
+				checksums[i] = a.Checksum
+			}
 
-	existingRecords, err := s.engine.ListAssetsRecords(registry.WithChecksums(checksums...))
-	if err != nil {
-		return fmt.Errorf("failed to get records: %w", err)
-	}
+			existing, listErr := s.engine.ListAssetsRecords(registry.WithChecksums(checksums...))
+			if listErr != nil {
+				return nil, fmt.Errorf("failed to fetch existing assets after duplicate: %w", listErr)
+			}
 
-	if len(existingRecords) > 0 {
-		existingChecksums := make([]*string, len(assets))
-		for i, record := range existingRecords {
-			existingChecksums[i] = &record.Checksum
+			return nil, AssetsExistsError{Checksums: registry.AssetsToChecksums(existing...)}
 		}
-
-		return AssetsExistsError{Checksums: existingChecksums}
+		// other errors
+		return nil, err
 	}
 
-	// Create records
-	return s.engine.CreateAssetRecords(assets...)
+	// Generate ingress urls
+	checksums := registry.AssetsToChecksums(assets...)
+	urls, err := s.GenerateIngressUrls(ctx, checksums...)
+	if err != nil {
+		return nil, err
+	}
+
+	return urls, err
+}
+
+func (s *Service) GenerateIngressUrls(ctx context.Context, checksums ...*string) ([]*registry.PresignedUrl, error) {
+	slog.Debug("attempting to generate ingress urls", "total", len(checksums))
+	ingress := make([]*registry.PresignedUrl, len(checksums))
+
+	for i, c := range checksums {
+		url, err := s.engine.IngressURL(ctx, *c)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %w", ErrCantGeneratePresignedUrl, err)
+		}
+		ingress[i] = url
+	}
+
+	return ingress, nil
 }

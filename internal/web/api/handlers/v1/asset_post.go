@@ -7,6 +7,7 @@ import (
 
 	"github.com/UnivocalX/aether/internal/web/api/dto"
 	"github.com/UnivocalX/aether/internal/web/services/data"
+	"github.com/UnivocalX/aether/pkg/registry"
 
 	"github.com/gin-gonic/gin"
 )
@@ -73,7 +74,7 @@ func HandleCreateAsset(svc *data.Service, ctx *gin.Context) {
 	}
 
 	// Success response
-	data := NewAssetPostResponseData(result)
+	data := NewAssetPostResponseData(result.Asset, result.UploadURL)
 	response := dto.NewResponse(ctx, "asset created successfully").WithData(data)
 
 	slog.InfoContext(ctx.Request.Context(), response.Message,
@@ -83,16 +84,16 @@ func HandleCreateAsset(svc *data.Service, ctx *gin.Context) {
 	response.Created(ctx)
 }
 
-func NewAssetPostResponseData(result *data.CreateAssetResult) *AssetPostResponseData {
+func NewAssetPostResponseData(asset *registry.Asset, uploadURL *registry.PresignedUrl) *AssetPostResponseData {
 	response := &AssetPostResponseData{
-		ID:       result.Asset.ID,
-		Checksum: result.Asset.Checksum,
-		State:    string(result.Asset.State),
+		ID:       asset.ID,
+		Checksum: asset.Checksum,
+		State:    string(asset.State),
 	}
 
-	if result.UploadURL != nil {
-		response.UploadURL = result.UploadURL.URL.Value()
-		response.ExpiresAt = &result.UploadURL.ExpiresAt
+	if uploadURL != nil {
+		response.UploadURL = uploadURL.URL.Value()
+		response.ExpiresAt = &uploadURL.ExpiresAt
 	}
 
 	return response

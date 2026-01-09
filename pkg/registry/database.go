@@ -46,30 +46,14 @@ func (engine *Engine) GetAssetRecordTags(sha256 string) ([]*Tag, error) {
 	return tags, nil
 }
 
-func (engine *Engine) CreateAssetRecord(
-	sha256 string,
-	display string,
-	extra map[string]any,
-) (*Asset, error) {
-	slog.Debug("Creating asset record", "display", display, "checksum", sha256)
-
-	asset := &Asset{
-		Checksum: sha256,
-		Display:  display,
-	}
-
-	// check for extra values
-	if extra != nil {
-		if err := asset.SetExtra(extra); err != nil {
-			return nil, fmt.Errorf("failed setting new asset %s extra field: %w", sha256, err)
-		}
-	}
+func (engine *Engine) CreateAssetRecord(asset *Asset) error {
+	slog.Debug("Creating asset record", "display", asset.Display, "checksum", asset.Checksum)
 
 	if err := engine.DatabaseClient.Create(asset).Error; err != nil {
-		return nil, fmt.Errorf("failed creating new asset %s: %w", sha256, err)
+		return fmt.Errorf("failed creating new asset %s: %w", asset.Checksum, err)
 	}
 
-	return asset, nil
+	return nil
 }
 
 func (engine *Engine) UpdateAssetRecord(asset *Asset) error {
