@@ -24,22 +24,22 @@ func RegisterRoutes(r gin.IRouter, svc *data.Service) {
 	})
 
 	// Get a specific asset tags
-	v1.GET("/assets/:checksum/tags", func(ctx *gin.Context) {
+	v1.GET("/assets/:asset_checksum/tags", func(ctx *gin.Context) {
 		ListAssetTagsHandler(svc, ctx)
 	})
 
 	// Get an asset ingress Url
-	v1.GET("/assets/:checksum/ingress", func(ctx *gin.Context) {
+	v1.GET("/assets/:asset_checksum/ingress", func(ctx *gin.Context) {
 		GetAssetIngressHandler(svc, ctx)
 	})
 
 	// Tag a specific asset
-	v1.PUT("/assets/:checksum/tags/:tag_name", func(ctx *gin.Context) {
+	v1.PUT("/assets/:asset_checksum/tags/:tag_name", func(ctx *gin.Context) {
 		TagAssetHandler(svc, ctx)
 	})
 
 	// Untag a specific asset
-	v1.DELETE("/assets/:checksum/tags/:tag_name", func(ctx *gin.Context) {
+	v1.DELETE("/assets/:asset_checksum/tags/:tag_name", func(ctx *gin.Context) {
 		UntagAssetHandler(svc, ctx)
 	})
 
