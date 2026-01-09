@@ -47,7 +47,7 @@ func CreateAssetsBatchHandler(svc *data.Service, ctx *gin.Context) {
 	}
 
 	// Convert request to records
-	assets, err := assetsBatchPayloadToRecords(&payload)
+	assets, err := assetsBatchToRecords(&payload)
 	if err != nil {
 		dto.HandleErrorResponse(
 			ctx,
@@ -64,7 +64,7 @@ func CreateAssetsBatchHandler(svc *data.Service, ctx *gin.Context) {
 	}
 
 	// Success response
-	data := NewCreateAssetsBatchResponseData(assets, ingressUrls)
+	data := NewAssetsBatchResponseData(assets, ingressUrls)
 	response := dto.NewResponse(ctx, "successfully executed batch").WithData(data)
 	slog.InfoContext(ctx.Request.Context(), response.Message,
 		"total", len(assets),
@@ -88,7 +88,7 @@ func NewBatchAsset(asset *registry.Asset, uploadURL *registry.PresignedUrl) *Bat
 	return response
 }
 
-func NewCreateAssetsBatchResponseData(
+func NewAssetsBatchResponseData(
 	assets []*registry.Asset,
 	urls []*registry.PresignedUrl,
 ) *AssetsBatchResponseData {
@@ -111,7 +111,7 @@ func NewCreateAssetsBatchResponseData(
 	}
 }
 
-func assetsBatchPayloadToRecords(payload *CreateAssetsBatchPayload) ([]*registry.Asset, error) {
+func assetsBatchToRecords(payload *CreateAssetsBatchPayload) ([]*registry.Asset, error) {
 	records := make([]*registry.Asset, len(payload.Assets))
 
 	for i, asset := range payload.Assets {

@@ -54,21 +54,16 @@ type GetTagAssetsResult struct {
 	Assets []*registry.Asset
 }
 
-func (s *Service) AddTag(ctx context.Context, name string) (*registry.Tag, error) {
-	slog.Debug("attempting to create tag")
+func (s *Service) CreateTag(ctx context.Context, name string) (*registry.Tag, error) {
+	slog.Debug("attempting to create tag", "name", name)
 
-	// Try to fetch existing tag
-	tag, err := s.engine.GetTagRecord(name)
+	// Try to create the tag
+	tag, err := s.engine.CreateTagRecord(name)
 	if err != nil {
-		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, err
+		if IsUniqueConstraintError(err) {
+			return nil, fmt.Errorf("%w: %s", ErrTagAlreadyExists, name)
 		}
-
-		// Tag not found → create it
-		tag, err = s.engine.SaveTagRecord(name)
-		if err != nil {
-			return nil, err
-		}
+		return nil, err // Created successfully
 	}
 
 	return tag, nil

@@ -8,7 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func GetAssetIngressURLsBatchHandler(svc *data.Service, ctx *gin.Context) {
+func GetAssetsBatchIngressHandler(svc *data.Service, ctx *gin.Context) {
 	dto.HandleErrorResponse(
 		ctx,
 		"Route not implemented",

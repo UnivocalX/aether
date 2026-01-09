@@ -112,7 +112,7 @@ func (s *Service) CreateAssets(ctx context.Context, assets ...*registry.Asset) (
 
 	// Try to create
 	if err := s.engine.CreateAssetRecords(assets...); err != nil {
-		// If duplicate error → fetch existing records and return them
+		// If duplicate error -> fetch existing records and return them
 		if IsUniqueConstraintError(err) {
 			checksums := make([]string, len(assets))
 			for i, a := range assets {

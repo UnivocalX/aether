@@ -2,14 +2,11 @@ package data
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 
 	"github.com/UnivocalX/aether/pkg/registry"
 	"gorm.io/gorm"
-
-	"github.com/jackc/pgx/v5/pgconn"
 )
 
 func (s *Service) CreateDataset(ctx context.Context, name string, description string) (*registry.DatasetVersion, error) {
@@ -22,14 +19,11 @@ func (s *Service) CreateDataset(ctx context.Context, name string, description st
 		// create dataset
 		ds, err := engine.CreateDatasetRecord(name, description)
 		if err != nil {
-			// Check PostgreSQL-specific error code
-			var pgErr *pgconn.PgError
-			if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-				slog.Debug("dataset already exist", "name", name)
+			if IsUniqueConstraintError(err) {
 				return fmt.Errorf("%w: %s", ErrDatasetAlreadyExists, name)
-			} else {
-				return fmt.Errorf("failed to create dataset: %w", err)
 			}
+
+			return fmt.Errorf("failed to create dataset: %w", err)
 		}
 
 		// create first version

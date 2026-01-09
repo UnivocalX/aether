@@ -50,13 +50,13 @@ func RegisterRoutes(r gin.IRouter, svc *data.Service) {
 	})
 
 	// Add tag
-	v1.PUT("/tags", func(ctx *gin.Context) {
-		AddTagHandler(svc, ctx)
+	v1.POST("/tags", func(ctx *gin.Context) {
+		CreateTagHandler(svc, ctx)
 	})
 
 	// Datasets
 	// Create dataset
-	v1.POST("/datasets/:dataset_name", func(ctx *gin.Context) {
+	v1.POST("/datasets", func(ctx *gin.Context) {
 		CreateDatasetHandler(svc, ctx)
 	})
 
@@ -68,6 +68,6 @@ func RegisterRoutes(r gin.IRouter, svc *data.Service) {
 
 	// Get assets ingress Urls
 	v1.GET("/batch/assets/ingress", func(ctx *gin.Context) {
-		GetAssetIngressURLsBatchHandler(svc, ctx)
+		GetAssetsBatchIngressHandler(svc, ctx)
 	})
 }

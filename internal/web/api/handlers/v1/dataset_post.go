@@ -10,6 +10,7 @@ import (
 )
 
 type CreateDatasetPayload struct {
+	Name        string `json:"name" binding:"required,max=100"`
 	Description string `json:"description" binding:"omitempty,max=1000"`
 }
 
@@ -20,19 +21,7 @@ type CreateDatasetResponseData struct {
 }
 
 func CreateDatasetHandler(svc *data.Service, ctx *gin.Context) {
-	var uri dto.DatasetUri
 	var payload CreateDatasetPayload
-
-	// Bind URI parameters
-	if err := ctx.ShouldBindUri(&uri); err != nil {
-		slog.ErrorContext(ctx.Request.Context(), "Invalid URI parameters", "error", err.Error())
-		dto.HandleErrorResponse(
-			ctx,
-			"failed to create dataset",
-			fmt.Errorf("%w, %w", dto.ErrInvalidUri, err),
-		)
-		return
-	}
 
 	// Bind JSON payload
 	if err := ctx.ShouldBindJSON(&payload); err != nil {
@@ -44,7 +33,7 @@ func CreateDatasetHandler(svc *data.Service, ctx *gin.Context) {
 		return
 	}
 
-	dsv, err := svc.CreateDataset(ctx.Request.Context(), uri.DatasetName, payload.Description)
+	dsv, err := svc.CreateDataset(ctx.Request.Context(), payload.Name, payload.Description)
 	if err != nil {
 		dto.HandleErrorResponse(ctx, "failed to create dataset", err)
 		return
@@ -62,5 +51,5 @@ func CreateDatasetHandler(svc *data.Service, ctx *gin.Context) {
 		"dataset", dsv,
 	)
 
-	response.OK(ctx)
+	response.Created(ctx)
 }

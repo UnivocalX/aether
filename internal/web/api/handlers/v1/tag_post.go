@@ -9,7 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type AddTagPayload struct {
+type CreateTagPayload struct {
 	Name string `json:"name" binding:"required,min=1,max=100"`
 }
 
@@ -18,21 +18,21 @@ type AddTagResponseData struct {
 	Name string `json:"name"`
 }
 
-func AddTagHandler(svc *data.Service, ctx *gin.Context) {
-	var payload AddTagPayload
+func CreateTagHandler(svc *data.Service, ctx *gin.Context) {
+	var payload CreateTagPayload
 
 	// Bind JSON payload
 	if err := ctx.ShouldBindJSON(&payload); err != nil {
 		dto.HandleErrorResponse(
 			ctx,
 			"failed to add tag",
-			fmt.Errorf("%w, %w", dto.ErrInvalidPayload, err),
+			fmt.Errorf("%w, %w", dto.ErrInvalidUri, err),
 		)
 		return
 	}
 
 	// Execute business logic
-	tag, err := svc.AddTag(ctx.Request.Context(), payload.Name)
+	tag, err := svc.CreateTag(ctx.Request.Context(), payload.Name)
 	if err != nil {
 		dto.HandleErrorResponse(ctx, "failed to add tag", err)
 		return

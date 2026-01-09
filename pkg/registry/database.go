@@ -110,12 +110,12 @@ func (engine *Engine) DetachTags(asset *Asset, tags []*Tag) error {
 	return nil
 }
 
-func (engine *Engine) SaveTagRecord(name string) (*Tag, error) {
-	slog.Debug("Saving tag", "name", name)
+func (engine *Engine) CreateTagRecord(name string) (*Tag, error) {
+	slog.Debug("creating a new tag", "name", name)
 
 	tag := &Tag{Name: name}
-	if err := engine.DatabaseClient.Save(tag).Error; err != nil {
-		return nil, fmt.Errorf("failed to save tag %s: %w", name, err)
+	if err := engine.DatabaseClient.Create(tag).Error; err != nil {
+		return nil, fmt.Errorf("failed to create tag %s: %w", name, err)
 	}
 
 	return tag, nil
