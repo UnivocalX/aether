@@ -79,7 +79,7 @@ func (s *Service) GetTag(ctx context.Context, name string) (*registry.Tag, error
 			return nil, fmt.Errorf("%w: %s", ErrTagNotFound, name)
 		}
 
-		return nil, fmt.Errorf("failed to get tag: %w", err)
+		return nil, err
 	}
 
 	return tag, nil
@@ -103,7 +103,7 @@ func (s *Service) GetTagAssets(ctx context.Context, params GetTagAssetsParams) (
 			return nil, fmt.Errorf("%w: %s", ErrTagNotFound, params.Name)
 		}
 
-		return nil, fmt.Errorf("failed to get tag assets: %w", err)
+		return nil, err
 	}
 
 	return assets, nil

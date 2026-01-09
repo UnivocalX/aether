@@ -23,7 +23,7 @@ func (s *Service) CreateDataset(ctx context.Context, name string, description st
 				return fmt.Errorf("%w: %s", ErrDatasetAlreadyExists, name)
 			}
 
-			return fmt.Errorf("failed to create dataset: %w", err)
+			return err
 		}
 
 		// create first version

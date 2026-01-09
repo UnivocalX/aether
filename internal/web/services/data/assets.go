@@ -39,7 +39,7 @@ func (s *Service) TagAsset(ctx context.Context, checksum string, tagName string)
 	}
 
 	if err := s.engine.AttachTags(asset, []*registry.Tag{tag}); err != nil {
-		return fmt.Errorf("failed to tag asset: %w", err)
+		return err
 	}
 
 	return nil
@@ -59,7 +59,7 @@ func (s *Service) UntagAsset(ctx context.Context, checksum string, tagName strin
 	}
 
 	if err := s.engine.DetachTags(asset, []*registry.Tag{tag}); err != nil {
-		return fmt.Errorf("failed to untag asset: %w", err)
+		return err
 	}
 
 	return nil
@@ -90,7 +90,7 @@ func (s *Service) GetAssetIngressUrl(ctx context.Context, checksum string) (*reg
 			return nil, fmt.Errorf("%w: %s", ErrAssetNotFound, checksum)
 		}
 
-		return nil, fmt.Errorf("failed to get asset presigned url: %w", err)
+		return nil, err
 	}
 
 	// reuploading a ready asset is not allowed
