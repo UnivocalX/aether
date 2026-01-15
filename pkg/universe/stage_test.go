@@ -6,19 +6,32 @@ import (
 	"time"
 )
 
-// Test helper functions
-func square(x int) int {
-	return x * x
+func increment(x int) int {
+	return x + 1
 }
 
-func double(x int) int {
-	return x * 2
+func isOdd(x int) bool {
+	if x % 2 == 1 {
+		return true
+	}
+
+	return false
 }
 
 // Basic functionality tests
-func TestStage_Naked(t *testing.T) {
+func TestStage_All(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel() // Always cancel to release resources
+	defer cancel()
 
-	Source(ctx, 1, 2, 3, 4, 5)
+	Incrementor := Map(Adapter(increment))
+	OddFilter := Filter(isOdd)
+
+	pipeline := NewPipeline(ctx, Generator(ctx, RandomList(5000)...))
+	pipeline.Merge(
+		pipeline.
+			Then(Incrementor).
+			Then(OddFilter).
+			UntilDone().
+			Scatter(Incrementor, 4)...
+	)
 }

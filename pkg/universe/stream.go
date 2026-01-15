@@ -5,7 +5,7 @@ import (
 	"sync"
 )
 
-func Source[T any](ctx context.Context, values ...T) <-chan Envelope[T] {
+func Generator[T any](ctx context.Context, values ...T) <-chan Envelope[T] {
 	out := make(chan Envelope[T], len(values))
 
 	go func() {
@@ -23,8 +23,8 @@ func Source[T any](ctx context.Context, values ...T) <-chan Envelope[T] {
 	return out
 }
 
-func Guard[T any](ctx context.Context, stream <-chan Envelope[T]) <-chan Envelope[T] {
-	out := make(chan Envelope[T])
+func OrDone[T any](ctx context.Context, stream <-chan T) <-chan T {
+	out := make(chan T)
 
 	go func() {
 		defer close(out)
@@ -33,12 +33,12 @@ func Guard[T any](ctx context.Context, stream <-chan Envelope[T]) <-chan Envelop
 			select {
 			case <-ctx.Done():
 				return
-			case env, ok := <-stream:
+			case value, ok := <-stream:
 				if !ok {
 					return
 				}
 				select {
-				case out <- env:
+				case out <- value:
 				case <-ctx.Done():
 				}
 			}
@@ -50,21 +50,22 @@ func Guard[T any](ctx context.Context, stream <-chan Envelope[T]) <-chan Envelop
 
 func FanIn[T any](
 	ctx context.Context,
-	streams ...<-chan Envelope[T],
-) <-chan Envelope[T] {
+	streams ...<-chan T,
+) <-chan T {
 
 	var wg sync.WaitGroup
-	out := make(chan Envelope[T])
+	out := make(chan T)
 
 	wg.Add(len(streams))
 	for _, s := range streams {
-		go func(c <-chan Envelope[T]) {
+
+		go func(c <-chan T) {
 			defer wg.Done()
-			for env := range c {
+			for value := range c {
 				select {
 				case <-ctx.Done():
 					return
-				case out <- env:
+				case out <- value:
 				}
 			}
 		}(s)
@@ -80,12 +81,12 @@ func FanIn[T any](
 
 func FanOut[T any](
 	ctx context.Context,
-	fn func(context.Context, <-chan Envelope[T]) <-chan Envelope[T],
-	stream <-chan Envelope[T],
+	fn func(context.Context, <-chan T) <-chan T,
+	stream <-chan T,
 	workers int,
-) []<-chan Envelope[T] {
+) []<-chan T {
 
-	out := make([]<-chan Envelope[T], workers)
+	out := make([]<-chan T, workers)
 
 	for i := 0; i < workers; i++ {
 		out[i] = fn(ctx, stream)
@@ -96,25 +97,25 @@ func FanOut[T any](
 
 func Tee[T any](
 	ctx context.Context,
-	stream <-chan Envelope[T],
-) (<-chan Envelope[T], <-chan Envelope[T]) {
+	stream <-chan T,
+) (<-chan T, <-chan T) {
 
-	out1 := make(chan Envelope[T])
-	out2 := make(chan Envelope[T])
+	out1 := make(chan T)
+	out2 := make(chan T)
 
 	go func() {
 		defer close(out1)
 		defer close(out2)
 
-		for env := range Guard(ctx, stream) {
+		for value := range OrDone(ctx, stream) {
 			var o1, o2 = out1, out2
 			for i := 2; i > 0; i-- {
 				select {
 				case <-ctx.Done():
 					return
-				case o1 <- env:
+				case o1 <- value:
 					o1 = nil
-				case o2 <- env:
+				case o2 <- value:
 					o2 = nil
 				}
 			}
@@ -126,16 +127,16 @@ func Tee[T any](
 
 func Bridge[T any](
 	ctx context.Context,
-	sos <-chan <-chan Envelope[T],
-) <-chan Envelope[T] {
+	sos <-chan <-chan T,
+) <-chan T {
 
-	out := make(chan Envelope[T])
+	out := make(chan T)
 
 	go func() {
 		defer close(out)
 
 		for {
-			var stream <-chan Envelope[T]
+			var stream <-chan T
 
 			select {
 			case <-ctx.Done():
@@ -147,11 +148,11 @@ func Bridge[T any](
 				stream = s
 			}
 
-			for env := range Guard(ctx, stream) {
+			for value := range OrDone(ctx, stream) {
 				select {
 				case <-ctx.Done():
 					return
-				case out <- env:
+				case out <- value:
 				}
 			}
 		}
