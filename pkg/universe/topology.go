@@ -5,17 +5,16 @@ import (
 	"sync"
 )
 
-func Generator[T any](ctx context.Context, values ...T) <-chan Envelope[T] {
-	out := make(chan Envelope[T], len(values))
+func Repeat[T any](ctx context.Context, fn func() T) <-chan T {
+	out := make(chan T)
 
 	go func() {
 		defer close(out)
-
-		for _, v := range values {
+		for {
 			select {
 			case <-ctx.Done():
 				return
-			case out <- Envelope[T]{Value: v}:
+			case out <- fn():
 			}
 		}
 	}()

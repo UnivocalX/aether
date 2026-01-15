@@ -11,7 +11,7 @@ func increment(x int) int {
 }
 
 func isOdd(x int) bool {
-	if x % 2 == 1 {
+	if x%2 == 1 {
 		return true
 	}
 
@@ -23,15 +23,15 @@ func TestStage_All(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	Incrementor := Map(Adapter(increment))
-	OddFilter := Filter(isOdd)
+	Incrementor := Map(ValueTransform(increment))
+	OddFilter := Filter(ValuePredicate(isOdd))
 
-	pipeline := NewPipeline(ctx, Generator(ctx, RandomList(5000)...))
+	pipeline := NewPipeline(ctx, Source(ctx, RandomList(5000)...))
 	pipeline.Merge(
 		pipeline.
 			Then(Incrementor).
 			Then(OddFilter).
 			UntilDone().
-			Scatter(Incrementor, 4)...
+			Scatter(Incrementor, 4)...,
 	)
 }
