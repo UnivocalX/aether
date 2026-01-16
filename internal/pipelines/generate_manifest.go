@@ -54,10 +54,7 @@ func GenerateManifestPipeline(pattern string, manifestPath string) error {
 		return fmt.Errorf("generate: no matching files %q", pattern)
 	}
 
-	// Create pipeline
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
+	// Stages
 	checksumCalculator := universe.TransformAdapter(checksum)
 	successPredicate := universe.PredicateAdapter(hasValue)
 	log := universe.ObserveErrorAdapter[string](
@@ -72,6 +69,10 @@ func GenerateManifestPipeline(pattern string, manifestPath string) error {
 		},
 	)
 
+	// Build pipeline
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	
 	pipeline := universe.NewPipeline(
 		universe.Concurrent(universe.Map(checksumCalculator), 8),
 		universe.Tap(log),
@@ -83,13 +84,10 @@ func GenerateManifestPipeline(pattern string, manifestPath string) error {
 	source := universe.Source(ctx, matches...)
 	checksumStream := pipeline.Run(ctx, source)
 
-	if err := universe.Consume[string](
-		ctx,
-		checksumStream,
-		consumer,
-	); err != nil {
+	// Consume results
+	if err := universe.Consume(ctx, checksumStream, consumer); err != nil {
 		return err
 	}
 
-	return nil
+	return ctx.Err()
 }
