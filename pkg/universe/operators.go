@@ -28,7 +28,7 @@ func Map[T any](
 	}
 }
 
-func Filter[T any](fn Predicator[T]) Operator[T] {
+func Filter[T any](fn Predicate[T]) Operator[T] {
 	return func(ctx context.Context, stream <-chan Envelope[T]) <-chan Envelope[T] {
 		filtered := make(chan Envelope[T])
 

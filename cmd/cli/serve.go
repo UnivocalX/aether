@@ -45,13 +45,13 @@ func startServer(cmd *cobra.Command, args []string) error {
 	// Setup server logging
 	slog.Debug("changing logging mode to server mode")
 	prod := viper.GetBool("server.production")
-	if err := setupLogging(prod); err != nil {
+	if err := updateLogging(prod); err != nil {
 		return err
 	}
 
 	// Create Core Engine(registry engine)
 	slog.Info("Initializing registry engine")
-	engine, err := initializeRegistry()
+	engine, err := initRegistry()
 	if err != nil {
 		return err
 	}
@@ -62,16 +62,16 @@ func startServer(cmd *cobra.Command, args []string) error {
 	return server.Run(port)
 }
 
-func setupLogging(prod bool) error {
-	Logging.SetMode(logging.ServerMode)
+func updateLogging(prod bool) error {
+	Log.SetMode(logging.ServerMode)
 	if !prod {
-		Logging.EnableColor()
+		Log.EnableColor()
 	}
-	Logging.Apply()
+	Log.Apply()
 	return nil
 }
 
-func initializeRegistry() (*registry.Engine, error) {
+func initRegistry() (*registry.Engine, error) {
 	opts := getRegistryOptions()
 	engine, err := registry.New(opts...)
 	if err != nil {

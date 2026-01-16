@@ -2,7 +2,7 @@ package universe
 
 type Transformer[T any] func(Envelope[T]) Envelope[T]
 
-type Predicator[T any] func(Envelope[T]) bool
+type Predicate[T any] func(Envelope[T]) bool
 
 type Observer[T any] func(Envelope[T])
 
@@ -11,12 +11,21 @@ type Reducer[T, R any] func(R, Envelope[T]) R
 type Consumer[T any] func(Envelope[T]) error
 
 // Transform value adapter
-func ValueTransformer[T any](fn func(T) T) Transformer[T] {
+func SimpleTransformer[T any](fn func(T) T) Transformer[T] {
 	return func(env Envelope[T]) Envelope[T] {
-
 		return Envelope[T]{
 			Value: fn(env.Value),
-			Err:   env.Err,
+			Err:   nil,
+		}
+	}
+}
+
+func ValueTransformer[T any](fn func(T) (T, error)) Transformer[T] {
+	return func(env Envelope[T]) Envelope[T] {
+		v, e := fn(env.Value)
+		return Envelope[T]{
+			Value: v,
+			Err:   e,
 		}
 	}
 }
@@ -33,14 +42,14 @@ func ErrorTransformer[T any](fn func(error) error) Transformer[T] {
 }
 
 // Predicate Value adapter
-func ValuePredicator[T any](fn func(T) bool) Predicator[T] {
+func ValuePredicate[T any](fn func(T) bool) Predicate[T] {
 	return func(env Envelope[T]) bool {
 		return fn(env.Value)
 	}
 }
 
 // Predicate Error adapter
-func ErrorPredicator[T any](fn func(error) bool) Predicator[T] {
+func ErrorPredicate[T any](fn func(error) bool) Predicate[T] {
 	return func(env Envelope[T]) bool {
 		return fn(env.Err)
 	}

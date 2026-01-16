@@ -31,11 +31,11 @@ var rootCmd = &cobra.Command{
 	Use:               "aether",
 	Short:             "Aether data platform CLI",
 	Long:              "A CLI tool for managing the Aether data platform",
-	PersistentPreRunE: initializeConfig,
+	PersistentPreRunE: initConfig,
 }
 
 // logging configuration
-var Logging = logging.NewLogging()
+var Log = logging.NewLog()
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 func Execute() {
@@ -46,7 +46,7 @@ func Execute() {
 }
 
 func init() {
-	Logging.Apply()
+	Log.Apply()
 
 	// Add subcommands
 	rootCmd.AddCommand(assets.AssetsCmd)
@@ -62,16 +62,16 @@ func init() {
 	}
 }
 
-// initializeConfig is called before command execution to set up configuration
-func initializeConfig(cmd *cobra.Command, args []string) error {
-	if err := setupViper(cmd); err != nil {
+// initConfig is called before command execution to set up configuration
+func initConfig(cmd *cobra.Command, args []string) error {
+	if err := loadConfig(cmd); err != nil {
 		return fmt.Errorf("failed to setup configuration: %w", err)
 	}
 
 	// Switch logging to cli
-	Logging.SetLevel(viper.GetString("level"))
-	Logging.SetMode(logging.CLIMode)
-	Logging.Apply()
+	Log.SetLevel(viper.GetString("level"))
+	Log.SetMode(logging.CLIMode)
+	Log.Apply()
 
 	slog.Debug("configuration loaded",
 		"configFile", viper.ConfigFileUsed(),
@@ -82,15 +82,15 @@ func initializeConfig(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// setupViper configures viper to read from config files, environment variables, and flags
-func setupViper(cmd *cobra.Command) error {
+// loadConfig configures viper to read from config files, environment variables, and flags
+func loadConfig(cmd *cobra.Command) error {
 	// Configure environment variable handling
 	viper.SetEnvPrefix(envPrefix)
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_", "-", "_"))
 	viper.AutomaticEnv()
 
 	// Configure config file
-	if err := setupConfigFile(); err != nil {
+	if err := readConfigFile(); err != nil {
 		return err
 	}
 
@@ -102,8 +102,8 @@ func setupViper(cmd *cobra.Command) error {
 	return nil
 }
 
-// setupConfigFile handles config file discovery and reading
-func setupConfigFile() error {
+// readConfigFile handles config file discovery and reading
+func readConfigFile() error {
 	if cfgFile != "" {
 		// Use config file from the flag
 		viper.SetConfigFile(cfgFile)

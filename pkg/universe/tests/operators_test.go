@@ -24,7 +24,7 @@ func TestMap(t *testing.T) {
 	}
 
 	// Create pipeline and run
-	upper := universe.ValueTransformer(strings.ToUpper)
+	upper := universe.SimpleTransformer((strings.ToUpper))
 	source := universe.Source(ctx, sayHello(5000)...)
 	out := universe.NewPipeline(universe.Map(upper)).Run(ctx, source)
 
@@ -61,7 +61,7 @@ func TestFilter(t *testing.T) {
 	}
 
 	// Keep only odd numbers
-	odd := universe.Filter(universe.ValuePredicator(func(n int) bool { return n%2 == 1 }))
+	odd := universe.Filter(universe.ValuePredicate(func(n int) bool { return n%2 == 1 }))
 
 	source := universe.Source(ctx, nums(100)...)
 	out := universe.NewPipeline(odd).Run(ctx, source)

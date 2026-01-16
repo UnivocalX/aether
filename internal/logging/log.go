@@ -14,15 +14,15 @@ const (
 	ServerMode Mode = "server"
 )
 
-type Logging struct {
+type Log struct {
 	mode    Mode
 	level   slog.Level
 	colored bool
 }
 
-type LoggingOption func(*Logging)
+type LogOption func(*Log)
 
-func (l *Logging) Apply() {
+func (l *Log) Apply() {
 	var handler slog.Handler
 	switch l.mode {
 	case CLIMode:
@@ -37,20 +37,20 @@ func (l *Logging) Apply() {
 	slog.SetDefault(logger)
 }
 
-func (l *Logging) SetMode(mode Mode) {
+func (l *Log) SetMode(mode Mode) {
 	l.mode = mode
 }
 
-func (l *Logging) SetLevel(level string) {
+func (l *Log) SetLevel(level string) {
 	l.level = parseLogLevel(level)
 }
 
-func (l *Logging) EnableColor() {
+func (l *Log) EnableColor() {
 	l.colored = true
 }
 
-func NewLogging(opts ...LoggingOption) *Logging {
-	l := &Logging{
+func NewLog(opts ...LogOption) *Log {
+	l := &Log{
 		mode:    BaseMode,
 		level:   slog.LevelInfo,
 		colored: false,
@@ -64,15 +64,15 @@ func NewLogging(opts ...LoggingOption) *Logging {
 }
 
 // WithMode sets the logging mode (base, cli, or server)
-func WithMode(mode Mode) LoggingOption {
-	return func(l *Logging) {
+func WithMode(mode Mode) LogOption {
+	return func(l *Log) {
 		l.mode = mode
 	}
 }
 
 // WithLevelString sets the log level from a string
-func WithLevelString(levelStr string) LoggingOption {
-	return func(l *Logging) {
+func WithLevelString(levelStr string) LogOption {
+	return func(l *Log) {
 		l.level = parseLogLevel(levelStr)
 	}
 }
