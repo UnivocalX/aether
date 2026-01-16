@@ -24,13 +24,13 @@ func TestMap(t *testing.T) {
 	}
 
 	// Create pipeline and run
-	upper := universe.SimpleTransformer((strings.ToUpper))
+	upper := universe.TransformValueAdapter((strings.ToUpper))
 	source := universe.Source(ctx, sayHello(5000)...)
 	out := universe.NewPipeline(universe.Map(upper)).Run(ctx, source)
 
 	// Checker: ensure transformation worked
 	expected := "HELLO"
-	checker := universe.ValueConsumer(
+	checker := universe.ConsumeAdapter(
 		func(s string) error {
 			if s != expected {
 				return fmt.Errorf("map transform failed: expected %q, got %q", expected, s)
@@ -61,13 +61,13 @@ func TestFilter(t *testing.T) {
 	}
 
 	// Keep only odd numbers
-	odd := universe.Filter(universe.ValuePredicate(func(n int) bool { return n%2 == 1 }))
+	odd := universe.Filter(universe.PredicateAdapter(func(n int) bool { return n%2 == 1 }))
 
 	source := universe.Source(ctx, nums(100)...)
 	out := universe.NewPipeline(odd).Run(ctx, source)
 
 	count := 0
-	checker := universe.ValueConsumer(func(n int) error {
+	checker := universe.ConsumeAdapter(func(n int) error {
 		if n%2 == 0 {
 			return fmt.Errorf("filter failed: even value %d passed", n)
 		}
@@ -101,13 +101,13 @@ func TestTap(t *testing.T) {
 	// Buffered channel to collect observations without blocking
 	observed := make(chan string, 200)
 
-	tap := universe.Tap(universe.ValueObserver(func(s string) { observed <- s }))
+	tap := universe.Tap(universe.ObserveAdapter(func(s string) { observed <- s }))
 
 	source := universe.Source(ctx, sayHello(200)...)
 	out := universe.NewPipeline(tap).Run(ctx, source)
 
 	// Consume results (no-op) and rely on `observed` for side-effect verification
-	checker := universe.ValueConsumer(func(s string) error { return nil })
+	checker := universe.ConsumeAdapter(func(s string) error { return nil })
 
 	if err := universe.Consume(ctx, out, checker); err != nil {
 		assertNoError(t, err, "Pipeline Tap")

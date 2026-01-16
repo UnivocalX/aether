@@ -41,8 +41,8 @@ func hasValue(value string) bool {
 	return true
 }
 
-func errorObserver[T any](env universe.Envelope[T]) {
-	slog.Error(env.Err.Error())
+func logError(e error) {
+	slog.Error(e.Error())
 }
 
 func GenerateManifestPipeline(pattern string, manifestPath string) error {
@@ -62,12 +62,13 @@ func GenerateManifestPipeline(pattern string, manifestPath string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	checksumCalculator := universe.ValueTransformer(checksum)
-	successPredicate := universe.ValuePredicate(hasValue)
+	checksumCalculator := universe.TransformAdapter(checksum)
+	successPredicate := universe.PredicateAdapter(hasValue)
+	log := universe.ObserveErrorAdapter[string](logError)
 
 	pipeline := universe.NewPipeline(
 		universe.Concurrent(universe.Map(checksumCalculator), 8),
-		universe.Tap[string](errorObserver),
+		universe.Tap(log),
 		universe.Filter(successPredicate),
 		universe.UntilDone[string](),
 	)
