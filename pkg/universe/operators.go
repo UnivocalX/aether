@@ -6,10 +6,10 @@ import (
 
 type Operator[T any] func(ctx context.Context, stream <-chan Envelope[T]) <-chan Envelope[T]
 
-type Transform[T any] func(Envelope[T]) Envelope[T]
+type Transformer[T any] func(Envelope[T]) Envelope[T]
 
 func Map[T any](
-	fn Transform[T],
+	fn Transformer[T],
 ) Operator[T] {
 	return func(ctx context.Context, stream <-chan Envelope[T]) <-chan Envelope[T] {
 		out := make(chan Envelope[T])
@@ -30,9 +30,9 @@ func Map[T any](
 	}
 }
 
-type Predicate[T any] func(Envelope[T]) bool
+type Predicator[T any] func(Envelope[T]) bool
 
-func Filter[T any](fn Predicate[T]) Operator[T] {
+func Filter[T any](fn Predicator[T]) Operator[T] {
 	return func(ctx context.Context, stream <-chan Envelope[T]) <-chan Envelope[T] {
 		filtered := make(chan Envelope[T])
 
@@ -54,9 +54,9 @@ func Filter[T any](fn Predicate[T]) Operator[T] {
 	}
 }
 
-type Observe[T any] func(Envelope[T])
+type Observer[T any] func(Envelope[T])
 
-func Tap[T any](fn Observe[T]) Operator[T] {
+func Tap[T any](fn Observer[T]) Operator[T] {
 	return func(ctx context.Context, stream <-chan Envelope[T]) <-chan Envelope[T] {
 		out := make(chan Envelope[T])
 
@@ -74,5 +74,17 @@ func Tap[T any](fn Observe[T]) Operator[T] {
 		}()
 
 		return out
+	}
+}
+
+func Concurrency[T any](op Operator[T], workers int) Operator[T] {
+	return func(ctx context.Context, stream <-chan Envelope[T]) <-chan Envelope[T] {
+		return FanIn(ctx, FanOut(ctx, op, stream, workers)...)
+	}
+}
+
+func UntilDone[T any]() Operator[T] {
+	return func(ctx context.Context, stream <-chan Envelope[T]) <-chan Envelope[T] {
+		return OrDone(ctx, stream)
 	}
 }

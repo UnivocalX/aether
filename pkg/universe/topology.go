@@ -5,12 +5,12 @@ import (
 	"sync"
 )
 
-func Repeat[T any](ctx context.Context, fn func() T) <-chan T {
+func Repeat[T any](ctx context.Context, fn func() T, times uint) <-chan T {
 	out := make(chan T)
 
 	go func() {
 		defer close(out)
-		for {
+		for i := 0; i < int(times); i++{
 			select {
 			case <-ctx.Done():
 				return
