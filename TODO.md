@@ -1,47 +1,43 @@
-package universe
+Other useful operators you might consider:
 
-import "context"
+Take / TakeWhile
 
-// Tap performs side-effects without modifying the stream.
-func Tap[T any](
-	fn func(Envelope[T]),
-) Stage[T]
+Limit the stream to a certain number of items or until a condition is false.
 
+Use: throttling, sampling, or early exit.
 
-// Partition splits a stream into two based on a predicate.
-// This is NOT a Stage because it changes topology.
-func Partition[T any](
-	ctx context.Context,
-	in <-chan Envelope[T],
-	predicate func(T) bool,
-) (
-	matched <-chan Envelope[T],
-	rest <-chan Envelope[T],
-)
+Skip / SkipWhile
 
+Ignore the first N items or until a condition is false.
 
-// Retry retries failed envelopes up to maxRetries.
-func Retry[T any](
-	maxRetries int,
-	shouldRetry func(err error) bool,
-) Stage[T]
+Use: ignore warm-up items or irrelevant data.
 
+FlatMap / Expand
 
-package universe
+Map each item to multiple items (or a stream) and flatten the results.
 
-import "context"
+Use: when one item generates many downstream items.
 
-// Sink consumes a stream and performs an action.
-func Sink[T any](
-	ctx context.Context,
-	in <-chan Envelope[T],
-	fn func(Envelope[T]),
-) error
+Buffer / Window
 
-// AbortOnError cancels the context on first error encountered.
-func AbortOnError[T any](
-	ctx context.Context,
-	cancel context.CancelFunc,
-	in <-chan Envelope[T],
-) <-chan Envelope[T]
+Collect items in batches of N or by time window.
 
+Use: batch processing, efficient I/O, or rate-limited calls.
+
+Distinct / Unique
+
+Remove duplicates from the stream.
+
+Use: deduplication of events.
+
+Retry / Recover
+
+Reattempt failed items or provide fallback.
+
+Use: robustness in unreliable pipelines (network requests, DB).
+
+Throttle / RateLimit
+
+Control the flow rate of the stream.
+
+Use: prevent overload downstream or API rate limits.

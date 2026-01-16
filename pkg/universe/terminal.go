@@ -30,9 +30,7 @@ func Collect[T any](
 	return out, ctx.Err()
 }
 
-type Consumer[T any] func(Envelope[T]) error
-
-func ForEach[T any](
+func Consume[T any](
 	ctx context.Context,
 	fn Consumer[T],
 	stream <-chan Envelope[T],
@@ -45,10 +43,8 @@ func ForEach[T any](
 	return ctx.Err()
 }
 
-type Reducer[T, R any] func(R, Envelope[T]) R
-
-// Aggregate works with Envelope streams, handling errors appropriately
-func Aggregate[T, R any](
+// Reduce works with Envelope streams, handling errors appropriately
+func Reduce[T, R any](
 	ctx context.Context,
 	fn Reducer[T, R],
 	stream <-chan Envelope[T],

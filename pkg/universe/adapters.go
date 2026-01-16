@@ -1,5 +1,15 @@
 package universe
 
+type Transformer[T any] func(Envelope[T]) Envelope[T]
+
+type Predicator[T any] func(Envelope[T]) bool
+
+type Observer[T any] func(Envelope[T])
+
+type Reducer[T, R any] func(R, Envelope[T]) R
+
+type Consumer[T any] func(Envelope[T]) error
+
 // Transform value adapter
 func ValueTransformer[T any](fn func(T) T) Transformer[T] {
 	return func(env Envelope[T]) Envelope[T] {
@@ -63,7 +73,6 @@ func ErrorConsumer[T any](fn func(error) error) Consumer[T] {
 		return fn(env.Err)
 	}
 }
-
 
 // reduce value adapter
 func ValueReducer[T, R any](fn func(R, T) R) Reducer[T, R] {
