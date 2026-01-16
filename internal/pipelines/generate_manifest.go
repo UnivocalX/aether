@@ -41,10 +41,6 @@ func hasValue(value string) bool {
 	return true
 }
 
-func logError(e error) {
-	slog.Error(e.Error())
-}
-
 func GenerateManifestPipeline(pattern string, manifestPath string) error {
 	slog.Info("starting to generate manifest file", "pattern", pattern)
 
@@ -64,7 +60,17 @@ func GenerateManifestPipeline(pattern string, manifestPath string) error {
 
 	checksumCalculator := universe.TransformAdapter(checksum)
 	successPredicate := universe.PredicateAdapter(hasValue)
-	log := universe.ObserveErrorAdapter[string](logError)
+	log := universe.ObserveErrorAdapter[string](
+		func(e error) {
+			slog.Error(e.Error())
+		},
+	)
+	consumer := universe.ConsumeAdapter(
+		func(checksum string) error {
+			slog.Info("computed checksum", "sha256", checksum)
+			return nil
+		},
+	)
 
 	pipeline := universe.NewPipeline(
 		universe.Concurrent(universe.Map(checksumCalculator), 8),
@@ -75,5 +81,15 @@ func GenerateManifestPipeline(pattern string, manifestPath string) error {
 
 	// Run pipeline
 	source := universe.Source(ctx, matches...)
-	checksums := pipeline.Run(ctx, source)
+	checksumStream := pipeline.Run(ctx, source)
+
+	if err := universe.Consume[string](
+		ctx,
+		checksumStream,
+		consumer,
+	); err != nil {
+		return err
+	}
+
+	return nil
 }
