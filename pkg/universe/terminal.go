@@ -32,8 +32,8 @@ func Collect[T any](
 
 func Consume[T any](
 	ctx context.Context,
-	fn Consumer[T],
 	stream <-chan Envelope[T],
+	fn Consumer[T],
 ) error {
 	for env := range OrDone(ctx, stream) {
 		if err := fn(env); err != nil {
@@ -46,8 +46,8 @@ func Consume[T any](
 // Reduce works with Envelope streams, handling errors appropriately
 func Reduce[T, R any](
 	ctx context.Context,
-	fn Reducer[T, R],
 	stream <-chan Envelope[T],
+	fn Reducer[T, R],
 	init R,
 ) (R, error) {
 	out := init

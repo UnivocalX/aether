@@ -40,7 +40,7 @@ func TestMap(t *testing.T) {
 	)
 
 	// Consume all results and fail test if any error occurs
-	if err := universe.ForEach(ctx, checker, out); err != nil {
+	if err := universe.Consume(ctx, out, checker); err != nil {
 		assertNoError(t, err, "Pipeline Map")
 	}
 
@@ -75,7 +75,7 @@ func TestFilter(t *testing.T) {
 		return nil
 	})
 
-	if err := universe.ForEach(ctx, checker, out); err != nil {
+	if err := universe.Consume(ctx, out, checker); err != nil {
 		assertNoError(t, err, "Pipeline Filter")
 	}
 
@@ -109,7 +109,7 @@ func TestTap(t *testing.T) {
 	// Consume results (no-op) and rely on `observed` for side-effect verification
 	checker := universe.ValueConsumer(func(s string) error { return nil })
 
-	if err := universe.ForEach(ctx, checker, out); err != nil {
+	if err := universe.Consume(ctx, out, checker); err != nil {
 		assertNoError(t, err, "Pipeline Tap")
 	}
 
