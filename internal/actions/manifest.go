@@ -113,16 +113,16 @@ func analyzeDirectoryPipeline(ctx context.Context, paths []string) *universe.Pip
 	return pipeline
 }
 
-func GenerateManifest(pattern string, manifestPath string) error {
-	slog.Info("starting to generate manifest file", "pattern", pattern)
+func ManifestBuilder(pattern string, manifestPath string) error {
+	slog.Info("starting to build manifest file", "pattern", pattern)
 
 	// Find matches
 	matches, err := filepath.Glob(pattern)
 	if err != nil {
-		return fmt.Errorf("generate: %w %q", err, pattern)
+		return fmt.Errorf("builder: %w %q", err, pattern)
 	}
 	if len(matches) == 0 {
-		return fmt.Errorf("generate: no matching files %q", pattern)
+		return fmt.Errorf("builder: no matching files %q", pattern)
 	}
 
 	// Run pipeline
@@ -146,7 +146,7 @@ func GenerateManifest(pattern string, manifestPath string) error {
 	)
 
 	if err != nil {
-		return fmt.Errorf("generate: failed to build manifest: %w", err)
+		return fmt.Errorf("builder: failed to build manifest: %w", err)
 	}
 
 	// write manifest to file
@@ -154,6 +154,6 @@ func GenerateManifest(pattern string, manifestPath string) error {
 		return err
 	}
 
-	slog.Info("manifest generated successfully", "path", manifestPath, "files", len(manifest.Files))
+	slog.Info("manifest built successfully", "path", manifestPath, "files", len(manifest.Files))
 	return nil
 }

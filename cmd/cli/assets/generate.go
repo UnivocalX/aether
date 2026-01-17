@@ -6,25 +6,25 @@ import (
 	"github.com/UnivocalX/aether/internal/actions"
 )
 
-// genCmd represents the load command
-var genCmd = &cobra.Command{
-	Use:           "gen <path> ",
-	Short:         "generate assets manifest.",
-	Long:          "generate assets manifest.",
-	Example:       "aether assets gen data/ manifest.yaml",
+// buildCmd represents the load command
+var manifestCmd = &cobra.Command{
+	Use:           "manifest <path> ",
+	Short:         "manifest an assets manifest file",
+	Long:          "manifest an assets manifest file",
+	Example:       "aether assets manifest data/ assets.yaml",
 	Args:          cobra.MinimumNArgs(2),
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return nil, cobra.ShellCompDirectiveFilterFileExt | cobra.ShellCompDirectiveFilterDirs
 	},
-	RunE: startGenManifest,
+	RunE: runManifestBuilder,
 }
 
-func startGenManifest(cmd *cobra.Command, args []string) error {
-	return actions.GenerateManifest(args[0], args[1])
+func runManifestBuilder(cmd *cobra.Command, args []string) error {
+	return actions.ManifestBuilder(args[0], args[1])
 }
 
 func init() {
-	AssetsCmd.AddCommand(genCmd)
+	AssetsCmd.AddCommand(manifestCmd)
 }
