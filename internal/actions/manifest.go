@@ -113,7 +113,7 @@ func analyzeDirectoryPipeline(ctx context.Context, paths []string) *universe.Pip
 	return pipeline
 }
 
-func ManifestBuilder(pattern string, manifestPath string) error {
+func BuildManifest(pattern string, manifestPath string) error {
 	slog.Info("starting to build manifest file", "pattern", pattern)
 
 	// Find matches

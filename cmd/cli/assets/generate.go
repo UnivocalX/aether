@@ -18,11 +18,11 @@ var manifestCmd = &cobra.Command{
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return nil, cobra.ShellCompDirectiveFilterFileExt | cobra.ShellCompDirectiveFilterDirs
 	},
-	RunE: runManifestBuilder,
+	RunE: runBuildManifest,
 }
 
-func runManifestBuilder(cmd *cobra.Command, args []string) error {
-	return actions.ManifestBuilder(args[0], args[1])
+func runBuildManifest(cmd *cobra.Command, args []string) error {
+	return actions.BuildManifest(args[0], args[1])
 }
 
 func init() {
