@@ -5,12 +5,29 @@ import (
 	"sync"
 )
 
-func Repeat[T any](ctx context.Context, fn func() T, times uint) <-chan T {
+func Generator[T any](ctx context.Context, values ...T) <-chan T {
 	out := make(chan T)
 
 	go func() {
 		defer close(out)
-		for i := 0; i < int(times); i++{
+		for _, v := range values {
+			select {
+			case <-ctx.Done():
+				return
+			case out <- v:
+			}
+		}
+
+	}()
+	return out
+}
+
+func Repeat[T any](ctx context.Context, fn func() T) <-chan T {
+	out := make(chan T)
+
+	go func() {
+		defer close(out)
+		for {
 			select {
 			case <-ctx.Done():
 				return
@@ -78,14 +95,14 @@ func FanIn[T any](
 	return out
 }
 
-func FanOut[T any](
+func FanOut[T, U any](
 	ctx context.Context,
-	fn func(context.Context, <-chan T) <-chan T,
+	fn func(context.Context, <-chan T) <-chan U,
 	stream <-chan T,
 	workers int,
-) []<-chan T {
+) []<-chan U {
 
-	out := make([]<-chan T, workers)
+	out := make([]<-chan U, workers)
 
 	for i := 0; i < workers; i++ {
 		out[i] = fn(ctx, stream)

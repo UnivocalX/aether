@@ -15,7 +15,10 @@ require (
 	gorm.io/gorm v1.31.0
 )
 
-require github.com/mattn/go-colorable v0.1.13 // indirect
+require (
+	github.com/mattn/go-colorable v0.1.13 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
+)
 
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect

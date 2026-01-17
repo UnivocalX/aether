@@ -2,6 +2,8 @@ package assets
 
 import (
 	"github.com/spf13/cobra"
+
+	"github.com/UnivocalX/aether/internal/actions"
 )
 
 // genCmd represents the load command
@@ -16,11 +18,11 @@ var genCmd = &cobra.Command{
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return nil, cobra.ShellCompDirectiveFilterFileExt | cobra.ShellCompDirectiveFilterDirs
 	},
-	RunE: GenerateManifest,
+	RunE: startGenManifest,
 }
 
-func GenerateManifest(cmd *cobra.Command, args []string) error {
-	return nil
+func startGenManifest(cmd *cobra.Command, args []string) error {
+	return actions.GenerateManifest(args[0], args[1])
 }
 
 func init() {
