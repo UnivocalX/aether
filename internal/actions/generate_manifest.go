@@ -104,13 +104,13 @@ func analyzeDirectoryPipeline(ctx context.Context, paths []string) *universe.Pip
 	}
 
 	// build pipeline
-	pathStream := universe.Of(ctx, paths...)
-	stream := universe.Map(pathStream, analyzer, 8).
+	source := universe.From(ctx, paths...)
+	pipeline := universe.Map(source, analyzer, 8).
 		Tap(logErrors, 1).
 		Filter(hasValidChecksum, 1).
 		UntilDone()
 
-	return stream
+	return pipeline
 }
 
 func GenerateManifest(pattern string, manifestPath string) error {

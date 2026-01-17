@@ -18,8 +18,8 @@ type Predicate[T any] func(Envelope[T]) bool
 
 type Observer[T any] func(Envelope[T])
 
-// Of creates a Stream from values
-func Of[T any](ctx context.Context, values ...T) *Pipeline[T] {
+// From creates a Stream from values
+func From[T any](ctx context.Context, values ...T) *Pipeline[T] {
 	outputStream := make(chan Envelope[T], len(values))
 
 	go func() {
