@@ -1,26 +1,33 @@
 package universe
 
-import "context"
+import (
+	"context"
+	"log/slog"
+)
 
-// Pipeline represents a composable stream of envelopes
+// Pipeline represents a composable, lazily‑evaluated stream of envelopes.
+// Each Pipeline stage defines how envelopes are produced or transformed.
 type Pipeline[T any] struct {
 	source func(context.Context) <-chan Envelope[T]
 }
 
+// Envelope wraps a value of type T and an optional error.
+// Errors propagate through the pipeline but do not crash goroutines
 type Envelope[T any] struct {
 	Value T
 	Err   error
 }
 
 type Transformer[T, U any] func(Envelope[T]) Envelope[U]
-
 type Predicate[T any] func(Envelope[T]) bool
-
 type Observer[T any] func(Envelope[T])
 
-// From creates a Stream from values
+// From creates a Pipeline from a fixed list of values.
+// Each value is emitted as an Envelope with no error.
+// Emission stops early if the context is canceled.
 func From[T any](ctx context.Context, values ...T) *Pipeline[T] {
-	outputStream := make(chan Envelope[T], len(values))
+	slog.Debug("creating pipeline from list of values", "totalItems", len(values))
+	outputStream := make(chan Envelope[T])
 
 	go func() {
 		defer close(outputStream)
@@ -41,13 +48,25 @@ func From[T any](ctx context.Context, values ...T) *Pipeline[T] {
 	}
 }
 
-// Map applies a transformation that can change the type from T to U
-// If workers > 1, the transformation runs concurrently
+// Map applies a transformation to each envelope.
 func Map[T, U any](s *Pipeline[T], fn Transformer[T, U], workers int) *Pipeline[U] {
 	return &Pipeline[U]{
 		source: func(ctx context.Context) <-chan Envelope[U] {
-			worker := func(ctx context.Context, stream <-chan Envelope[T]) <-chan Envelope[U] {
-				return transformWorker(ctx, stream, fn)
+			worker := func(ctx context.Context, in <-chan Envelope[T]) <-chan Envelope[U] {
+				out := make(chan Envelope[U])
+
+				go func() {
+					defer close(out)
+					for env := range in {
+						select {
+						case <-ctx.Done():
+							return
+						case out <- fn(env):
+						}
+					}
+				}()
+
+				return out
 			}
 
 			return FanIn(ctx, FanOut(ctx, worker, s.source(ctx), workers)...)
@@ -55,13 +74,25 @@ func Map[T, U any](s *Pipeline[T], fn Transformer[T, U], workers int) *Pipeline[
 	}
 }
 
-// Transform applies a transformation that keeps the same type T
-// If workers > 1, the transformation runs concurrently
+// Transform applies a transformation that keeps the same type.
 func (s *Pipeline[T]) Transform(fn Transformer[T, T], workers int) *Pipeline[T] {
 	return &Pipeline[T]{
 		source: func(ctx context.Context) <-chan Envelope[T] {
-			worker := func(ctx context.Context, input <-chan Envelope[T]) <-chan Envelope[T] {
-				return transformWorker(ctx, input, fn)
+			worker := func(ctx context.Context, in <-chan Envelope[T]) <-chan Envelope[T] {
+				out := make(chan Envelope[T])
+
+				go func() {
+					defer close(out)
+					for env := range in {
+						select {
+						case <-ctx.Done():
+							return
+						case out <- fn(env):
+						}
+					}
+				}()
+
+				return out
 			}
 
 			return FanIn(ctx, FanOut(ctx, worker, s.source(ctx), workers)...)
@@ -69,31 +100,28 @@ func (s *Pipeline[T]) Transform(fn Transformer[T, T], workers int) *Pipeline[T] 
 	}
 }
 
-func transformWorker[T, U any](ctx context.Context, stream <-chan Envelope[T], fn Transformer[T, U]) <-chan Envelope[U] {
-	outputStream := make(chan Envelope[U])
-
-	go func() {
-		defer close(outputStream)
-
-		for env := range stream {
-			select {
-			case <-ctx.Done():
-				return
-			case outputStream <- fn(env):
-			}
-		}
-	}()
-
-	return outputStream
-}
-
-// Filter keeps only envelopes that match the predicate
-// If workers > 1, filtering runs concurrently
+// Filter passes through only envelopes that satisfy the predicate.
 func (s *Pipeline[T]) Filter(fn Predicate[T], workers int) *Pipeline[T] {
 	return &Pipeline[T]{
 		source: func(ctx context.Context) <-chan Envelope[T] {
-			worker := func(ctx context.Context, stream <-chan Envelope[T]) <-chan Envelope[T] {
-				return filterWorker(ctx, stream, fn)
+			worker := func(ctx context.Context, in <-chan Envelope[T]) <-chan Envelope[T] {
+				out := make(chan Envelope[T])
+
+				go func() {
+					defer close(out)
+					for env := range in {
+						if !fn(env) {
+							continue
+						}
+						select {
+						case <-ctx.Done():
+							return
+						case out <- env:
+						}
+					}
+				}()
+
+				return out
 			}
 
 			return FanIn(ctx, FanOut(ctx, worker, s.source(ctx), workers)...)
@@ -101,33 +129,27 @@ func (s *Pipeline[T]) Filter(fn Predicate[T], workers int) *Pipeline[T] {
 	}
 }
 
-func filterWorker[T any](ctx context.Context, stream <-chan Envelope[T], fn Predicate[T]) <-chan Envelope[T] {
-	out := make(chan Envelope[T])
-
-	go func() {
-		defer close(out)
-
-		for env := range stream {
-			if fn(env) {
-				select {
-				case <-ctx.Done():
-					return
-				case out <- env:
-				}
-			}
-		}
-	}()
-
-	return out
-}
-
-// Tap performs a side-effect on each envelope
-// If workers > 1, side-effects run concurrently
+// Tap executes a side-effect for each envelope.
 func (s *Pipeline[T]) Tap(fn Observer[T], workers int) *Pipeline[T] {
 	return &Pipeline[T]{
 		source: func(ctx context.Context) <-chan Envelope[T] {
-			worker := func(ctx context.Context, stream <-chan Envelope[T]) <-chan Envelope[T] {
-				return tapWorker(ctx, stream, fn)
+			worker := func(ctx context.Context, in <-chan Envelope[T]) <-chan Envelope[T] {
+				out := make(chan Envelope[T])
+
+				go func() {
+					defer close(out)
+					for env := range in {
+						fn(env)
+
+						select {
+						case <-ctx.Done():
+							return
+						case out <- env:
+						}
+					}
+				}()
+
+				return out
 			}
 
 			return FanIn(ctx, FanOut(ctx, worker, s.source(ctx), workers)...)
@@ -135,26 +157,8 @@ func (s *Pipeline[T]) Tap(fn Observer[T], workers int) *Pipeline[T] {
 	}
 }
 
-func tapWorker[T any](ctx context.Context, stream <-chan Envelope[T], fn Observer[T]) <-chan Envelope[T] {
-	out := make(chan Envelope[T])
-
-	go func() {
-		defer close(out)
-		for env := range stream {
-			fn(env) // side-effect
-
-			select {
-			case <-ctx.Done():
-				return
-			case out <- env:
-			}
-		}
-	}()
-
-	return out
-}
-
-// UntilDone ensures the stream respects context cancellation
+// UntilDone wraps the pipeline so that it stops producing values as soon
+// as the context is canceled. This helps ensure all stages respect cancellation.
 func (s *Pipeline[T]) UntilDone() *Pipeline[T] {
 	return &Pipeline[T]{
 		source: func(ctx context.Context) <-chan Envelope[T] {
@@ -163,7 +167,8 @@ func (s *Pipeline[T]) UntilDone() *Pipeline[T] {
 	}
 }
 
-// Run executes the stream and returns the output channel
+// Run starts the pipeline and returns the final output channel.
+// It is the terminal operation that consumes all upstream definitions.
 func (s *Pipeline[T]) Run(ctx context.Context) <-chan Envelope[T] {
 	return s.source(ctx)
 }
