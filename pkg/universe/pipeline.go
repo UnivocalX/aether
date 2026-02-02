@@ -7,99 +7,100 @@ import (
 	"sync/atomic"
 )
 
-// Pipeline represents a composable, lazily‑evaluated stream of envelopes.
-// Each Pipeline stage defines how envelopes are produced or transformed.
+// Pipeline represents a composable, lazily-evaluated stream of envelopes.
 type Pipeline[T any] struct {
-	generator func(context.Context) <-chan Envelope[T]
-	Meta      *Meta
+	generator func(ctx context.Context) Stream[T]
 }
 
-// Envelope wraps a value of type T and an optional error.
-// Errors propagate through the pipeline but do not crash goroutines
+// Stream wraps a channel of Envelope[T] and associated metadata.
 type Stream[T any] struct {
-	*Meta
+	Meta *Meta
 	Data <-chan Envelope[T]
 }
 
+// Envelope wraps a value and an optional error.
 type Envelope[T any] struct {
 	Value T
 	Err   error
 }
 
+// Meta holds attributes and tracks errors during pipeline execution.
 type Meta struct {
-	Attributes       sync.Map
 	OriginTotalItems int
-	hasError         atomic.Bool
+	Attributes       sync.Map
+	errorOccurred    atomic.Bool
 }
 
-func (m *Meta) MarkHasErrors(statement bool) {
+func (m *Meta) MarkErrorOccurred(statement bool) {
 	if statement {
-		m.hasError.Store(true)
+		m.errorOccurred.Store(true)
 	}
 }
 
-func (m *Meta) HasErrors() bool {
-	return m.hasError.Load()
+func (m *Meta) ErrorOccurred() bool {
+	return m.errorOccurred.Load()
 }
 
+// Transformer defines a function that transforms an Envelope[T] into an Envelope[U].
 type Transformer[T, U any] func(*Meta, Envelope[T]) Envelope[U]
+
+// Predicate defines a function to filter envelopes.
 type Predicate[T any] func(*Meta, Envelope[T]) bool
+
+// Observer defines a function to perform side-effects on envelopes.
 type Observer[T any] func(*Meta, Envelope[T])
 
-// From creates a Pipeline from a fixed list of values.
-// Each value is emitted as an Envelope with no error.
-// Emission stops early if the context is canceled.
+// From creates a Pipeline from a list of values.
 func From[T any](ctx context.Context, values ...T) *Pipeline[T] {
 	slog.Debug("creating pipeline from list of values", "totalItems", len(values))
-	out := make(chan Envelope[T])
-
-	go func() {
-		defer close(out)
-
-		for _, v := range values {
-			select {
-			case <-ctx.Done():
-				return
-			case out <- Envelope[T]{Value: v}:
-			}
-		}
-	}()
 
 	return &Pipeline[T]{
-		Meta: &Meta{OriginTotalItems: len(values)},
-		generator: func(context.Context) <-chan Envelope[T] {
-			return out
+		generator: func(ctx context.Context) Stream[T] {
+			out := make(chan Envelope[T])
+			meta := &Meta{OriginTotalItems: len(values)}
+
+			go func() {
+				defer close(out)
+				for _, v := range values {
+					select {
+					case <-ctx.Done():
+						return
+					case out <- Envelope[T]{Value: v}:
+					}
+				}
+			}()
+
+			return Stream[T]{Data: out, Meta: meta}
 		},
 	}
 }
 
-// Map applies a transformation to each envelope.
-func Map[T, U any](s *Pipeline[T], fn Transformer[T, U], workers int) *Pipeline[U] {
+// Map applies a transformation to each envelope in the pipeline with worker parallelism.
+func Map[T, U any](p *Pipeline[T], fn Transformer[T, U], workers int) *Pipeline[U] {
 	return &Pipeline[U]{
-		Meta: s.Meta,
-		generator: func(ctx context.Context) <-chan Envelope[U] {
+		generator: func(ctx context.Context) Stream[U] {
+			inStream := p.generator(ctx)
+			meta := inStream.Meta
+
 			worker := func(ctx context.Context, in <-chan Envelope[T]) <-chan Envelope[U] {
 				out := make(chan Envelope[U])
-
 				go func() {
 					defer close(out)
-
 					for env := range in {
-						oe := fn(s.Meta, env)
-
+						oe := fn(meta, env)
 						select {
 						case <-ctx.Done():
 							return
 						case out <- oe:
-							s.Meta.MarkHasErrors(oe.Err != nil)
+							meta.MarkErrorOccurred(oe.Err != nil)
 						}
 					}
 				}()
-
 				return out
 			}
 
-			return FanIn(ctx, FanOut(ctx, worker, s.generator(ctx), workers)...)
+			fanned := FanOut(ctx, worker, inStream.Data, workers)
+			return Stream[U]{Data: FanIn(ctx, fanned...), Meta: meta}
 		},
 	}
 }
@@ -107,29 +108,29 @@ func Map[T, U any](s *Pipeline[T], fn Transformer[T, U], workers int) *Pipeline[
 // Transform applies a transformation that keeps the same type.
 func (p *Pipeline[T]) Transform(fn Transformer[T, T], workers int) *Pipeline[T] {
 	return &Pipeline[T]{
-		Meta: p.Meta,
-		generator: func(ctx context.Context) <-chan Envelope[T] {
+		generator: func(ctx context.Context) Stream[T] {
+			inStream := p.generator(ctx)
+			meta := inStream.Meta
+
 			worker := func(ctx context.Context, in <-chan Envelope[T]) <-chan Envelope[T] {
 				out := make(chan Envelope[T])
-
 				go func() {
 					defer close(out)
 					for env := range in {
-						oe := fn(p.Meta, env)
-
+						oe := fn(meta, env)
 						select {
 						case <-ctx.Done():
 							return
 						case out <- oe:
-							p.Meta.MarkHasErrors(oe.Err != nil)
+							meta.MarkErrorOccurred(oe.Err != nil)
 						}
 					}
 				}()
-
 				return out
 			}
 
-			return FanIn(ctx, FanOut(ctx, worker, p.generator(ctx), workers)...)
+			fanned := FanOut(ctx, worker, inStream.Data, workers)
+			return Stream[T]{Data: FanIn(ctx, fanned...), Meta: meta}
 		},
 	}
 }
@@ -137,14 +138,16 @@ func (p *Pipeline[T]) Transform(fn Transformer[T, T], workers int) *Pipeline[T] 
 // Filter passes through only envelopes that satisfy the predicate.
 func (p *Pipeline[T]) Filter(fn Predicate[T], workers int) *Pipeline[T] {
 	return &Pipeline[T]{
-		generator: func(ctx context.Context) <-chan Envelope[T] {
+		generator: func(ctx context.Context) Stream[T] {
+			inStream := p.generator(ctx)
+			meta := inStream.Meta
+
 			worker := func(ctx context.Context, in <-chan Envelope[T]) <-chan Envelope[T] {
 				out := make(chan Envelope[T])
-
 				go func() {
 					defer close(out)
 					for env := range in {
-						if !fn(p.Meta, env) {
+						if !fn(meta, env) {
 							continue
 						}
 						select {
@@ -154,27 +157,28 @@ func (p *Pipeline[T]) Filter(fn Predicate[T], workers int) *Pipeline[T] {
 						}
 					}
 				}()
-
 				return out
 			}
 
-			return FanIn(ctx, FanOut(ctx, worker, p.generator(ctx), workers)...)
+			fanned := FanOut(ctx, worker, inStream.Data, workers)
+			return Stream[T]{Data: FanIn(ctx, fanned...), Meta: meta}
 		},
 	}
 }
 
-// Tap executes a side-effect for each envelope.
+// Tap executes a side-effect function for each envelope.
 func (p *Pipeline[T]) Tap(fn Observer[T], workers int) *Pipeline[T] {
 	return &Pipeline[T]{
-		generator: func(ctx context.Context) <-chan Envelope[T] {
+		generator: func(ctx context.Context) Stream[T] {
+			inStream := p.generator(ctx)
+			meta := inStream.Meta
+
 			worker := func(ctx context.Context, in <-chan Envelope[T]) <-chan Envelope[T] {
 				out := make(chan Envelope[T])
-
 				go func() {
 					defer close(out)
 					for env := range in {
-						fn(p.Meta, env)
-
+						fn(meta, env)
 						select {
 						case <-ctx.Done():
 							return
@@ -182,30 +186,26 @@ func (p *Pipeline[T]) Tap(fn Observer[T], workers int) *Pipeline[T] {
 						}
 					}
 				}()
-
 				return out
 			}
 
-			return FanIn(ctx, FanOut(ctx, worker, p.generator(ctx), workers)...)
+			fanned := FanOut(ctx, worker, inStream.Data, workers)
+			return Stream[T]{Data: FanIn(ctx, fanned...), Meta: meta}
 		},
 	}
 }
 
-// UntilDone wraps the pipeline so that it stops producing values as soon
-// as the context is canceled. This helps ensure all stages respect cancellation.
+// UntilDone ensures the pipeline respects context cancellation.
 func (p *Pipeline[T]) UntilDone() *Pipeline[T] {
 	return &Pipeline[T]{
-		generator: func(ctx context.Context) <-chan Envelope[T] {
-			return OrDone(ctx, p.generator(ctx))
+		generator: func(ctx context.Context) Stream[T] {
+			inStream := p.generator(ctx)
+			return Stream[T]{Data: OrDone(ctx, inStream.Data), Meta: inStream.Meta}
 		},
 	}
 }
 
-// Run starts the pipeline and returns the final output channel.
-// It is the terminal operation that consumes all upstream definitions.
+// Run starts the pipeline and returns the final Stream.
 func (p *Pipeline[T]) Run(ctx context.Context) Stream[T] {
-	return Stream[T]{
-		Data: p.generator(ctx),
-		Meta: p.Meta,
-	}
+	return p.generator(ctx)
 }
