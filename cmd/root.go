@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/UnivocalX/aether/cmd/cli/assets"
+	"github.com/UnivocalX/aether/cmd/cli/commands"
 	"github.com/UnivocalX/aether/internal/logging"
 
 	"github.com/spf13/cobra"
@@ -25,6 +25,7 @@ var (
 	logLevel string
 	endpoint string
 )
+
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -49,7 +50,9 @@ func init() {
 	Log.Apply()
 
 	// Add subcommands
-	rootCmd.AddCommand(assets.AssetsCmd)
+	rootCmd.AddCommand(commands.AssetsCmd)
+	rootCmd.AddCommand(commands.TagsCmd)
+	rootCmd.AddCommand(commands.ServeCmd)
 
 	// Define persistent flags
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.aether/config.yaml)")

@@ -1,10 +1,17 @@
-package assets
+package commands
 
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/UnivocalX/aether/internal/client"
+	"github.com/UnivocalX/aether/internal/actions"
 )
+
+// AssetsCmd represents the assets command
+var AssetsCmd = &cobra.Command{
+	Use:   "assets",
+	Short: "Manage and interact with data assets.",
+	Run:   func(cmd *cobra.Command, args []string) {},
+}
 
 // buildCmd represents the load command
 var loadCmd = &cobra.Command{
@@ -22,7 +29,15 @@ var loadCmd = &cobra.Command{
 }
 
 func runLoadAssets(cmd *cobra.Command, args []string) error {
-	return client.LoadAssets(args[0], true)
+	client, err := actions.NewClient(
+		actions.Interactive(),
+	)
+
+	if err != nil {
+		return err
+	}
+
+	return client.LoadAssets(args[0])
 }
 
 func init() {

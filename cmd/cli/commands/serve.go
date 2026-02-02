@@ -1,4 +1,4 @@
-package main
+package commands
 
 import (
 	"fmt"
@@ -9,11 +9,11 @@ import (
 
 	"github.com/UnivocalX/aether/internal/logging"
 	"github.com/UnivocalX/aether/internal/web"
-	"github.com/UnivocalX/aether/pkg/registry"
+	"github.com/UnivocalX/aether/internal/registry"
 )
 
-// serveCmd represents the serve command
-var serveCmd = &cobra.Command{
+// ServeCmd represents the serve command
+var ServeCmd = &cobra.Command{
 	Use:           "serve",
 	Short:         "Starts the aether api server",
 	SilenceUsage:  true,
@@ -22,21 +22,19 @@ var serveCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(serveCmd)
-
 	// Storage
-	serveCmd.Flags().Int("port", 8080, "Port to run the server on")
-	serveCmd.Flags().String("s3endpoint", "", "S3 endpoint")
-	serveCmd.Flags().String("bucket", "", "S3 bucket.")
-	serveCmd.Flags().String("prefix", "aether", "S3 prefix.")
+	ServeCmd.Flags().Int("port", 8080, "Port to run the server on")
+	ServeCmd.Flags().String("s3endpoint", "", "S3 endpoint")
+	ServeCmd.Flags().String("bucket", "", "S3 bucket.")
+	ServeCmd.Flags().String("prefix", "aether", "S3 prefix.")
 
 	// Database
-	serveCmd.Flags().String("db-endpoint", "localhost:5432", "Database port.")
-	serveCmd.Flags().String("db-user", "postgres", "")
-	serveCmd.Flags().String("db-password", "changeme", "Port to run the server on")
-	serveCmd.Flags().String("db-name", "postgres", "Database name.")
-	serveCmd.Flags().Bool("ssl", false, "Database SSL.")
-	serveCmd.Flags().Bool("production", false, "Run in production mode (enables JSON logging)")
+	ServeCmd.Flags().String("db-endpoint", "localhost:5432", "Database port.")
+	ServeCmd.Flags().String("db-user", "postgres", "")
+	ServeCmd.Flags().String("db-password", "changeme", "Port to run the server on")
+	ServeCmd.Flags().String("db-name", "postgres", "Database name.")
+	ServeCmd.Flags().Bool("ssl", false, "Database SSL.")
+	ServeCmd.Flags().Bool("production", false, "Run in production mode (enables JSON logging)")
 
 	bindServeFlags()
 }
@@ -63,6 +61,8 @@ func startServer(cmd *cobra.Command, args []string) error {
 }
 
 func updateLogging(prod bool) error {
+	Log := logging.NewLog()
+
 	Log.SetMode(logging.ServerMode)
 	if !prod {
 		Log.EnableColor()
@@ -107,18 +107,18 @@ func getRegistryOptions() []registry.Option {
 
 func bindServeFlags() {
 	// Server settings
-	viper.BindPFlag("server.port", serveCmd.Flags().Lookup("port"))
-	viper.BindPFlag("server.production", serveCmd.Flags().Lookup("production"))
+	viper.BindPFlag("server.port", ServeCmd.Flags().Lookup("port"))
+	viper.BindPFlag("server.production", ServeCmd.Flags().Lookup("production"))
 
 	// Storage settings
-	viper.BindPFlag("server.storage.s3endpoint", serveCmd.Flags().Lookup("s3endpoint"))
-	viper.BindPFlag("server.storage.bucket", serveCmd.Flags().Lookup("bucket"))
-	viper.BindPFlag("server.storage.prefix", serveCmd.Flags().Lookup("prefix"))
+	viper.BindPFlag("server.storage.s3endpoint", ServeCmd.Flags().Lookup("s3endpoint"))
+	viper.BindPFlag("server.storage.bucket", ServeCmd.Flags().Lookup("bucket"))
+	viper.BindPFlag("server.storage.prefix", ServeCmd.Flags().Lookup("prefix"))
 
 	// Database settings
-	viper.BindPFlag("server.database.endpoint", serveCmd.Flags().Lookup("db-endpoint"))
-	viper.BindPFlag("server.database.user", serveCmd.Flags().Lookup("db-user"))
-	viper.BindPFlag("server.database.password", serveCmd.Flags().Lookup("db-password"))
-	viper.BindPFlag("server.database.name", serveCmd.Flags().Lookup("db-name"))
-	viper.BindPFlag("server.database.ssl", serveCmd.Flags().Lookup("ssl"))
+	viper.BindPFlag("server.database.endpoint", ServeCmd.Flags().Lookup("db-endpoint"))
+	viper.BindPFlag("server.database.user", ServeCmd.Flags().Lookup("db-user"))
+	viper.BindPFlag("server.database.password", ServeCmd.Flags().Lookup("db-password"))
+	viper.BindPFlag("server.database.name", ServeCmd.Flags().Lookup("db-name"))
+	viper.BindPFlag("server.database.ssl", ServeCmd.Flags().Lookup("ssl"))
 }
