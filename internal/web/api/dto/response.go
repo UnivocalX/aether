@@ -7,7 +7,7 @@ import (
 	"time"
 
 	dataService "github.com/UnivocalX/aether/internal/web/services/data"
-	"github.com/UnivocalX/aether/pkg/registry"
+	"github.com/UnivocalX/aether/internal/registry"
 	"github.com/gin-gonic/gin"
 )
 

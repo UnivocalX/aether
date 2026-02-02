@@ -1,4 +1,4 @@
-package client
+package actions
 
 import (
 	"context"
@@ -63,18 +63,12 @@ func checksum(path string) (string, error) {
 	return hex.EncodeToString(hasher.Sum(nil)), nil
 }
 
-func analyzePipeline(ctx context.Context, paths []string, progress bool) <-chan universe.Envelope[FileChecksum] {
+func analyzePipeline(ctx context.Context, paths []string, progress bool) universe.Stream[FileChecksum] {
 	slog.Info("starting to analyze paths...", "total", len(paths))
 	fmt.Printf("\n")
 
 	// transform path string to FileChecksum
-	analyzer := func(env universe.Envelope[string]) universe.Envelope[FileChecksum] {
-		fc, err := analyzeFile(env.Value)
-		return universe.Envelope[FileChecksum]{
-			Value: fc,
-			Err:   err,
-		}
-	}
+	analyzer := universe.TransformValue(analyzeFile)
 
 	// create progress bar
 	bar := progressbar.NewOptions(
@@ -84,16 +78,17 @@ func analyzePipeline(ctx context.Context, paths []string, progress bool) <-chan 
 		progressbar.OptionSetVisibility(progress),
 		progressbar.OptionSetWriter(os.Stderr),
 		progressbar.OptionShowCount(),
-		progressbar.OptionOnCompletion(func ()  {
+		progressbar.OptionOnCompletion(func() {
 			defer fmt.Printf("\n")
 		}),
 	)
 
 	// handle progress bar progress
-	barHandler := func(env universe.Envelope[FileChecksum]) {
+	barHandler := func(meta *universe.Meta, env universe.Envelope[FileChecksum]) {
 		if env.Err != nil {
 			slog.Error("analyze failed", "error", env.Err)
 		}
+
 		bar.Add(1)
 	}
 
@@ -101,4 +96,47 @@ func analyzePipeline(ctx context.Context, paths []string, progress bool) <-chan 
 	source := universe.From(ctx, paths...)
 	pipeline := universe.Map(source, analyzer, 8).Tap(barHandler, 1)
 	return pipeline.Run(ctx)
+}
+
+func handleAnalysisResult(
+	ctx context.Context,
+	stream universe.Stream[FileChecksum],
+	interactive bool,
+) (success, failure []universe.Envelope[FileChecksum], err error) {
+	success, failures, err := universe.Partition(ctx, stream.Data)
+
+	switch {
+	// failed to partition (ctx errors)
+	case err != nil:
+		return success, failures, err
+	
+	// no success
+	case len(success) == 0:
+		return success, failures, fmt.Errorf("no files were successfully analyzed")
+	
+	// no failures
+	case len(failures) == 0:
+		return success, failures, nil
+	
+	// failed analyze some files
+	default:
+		prompt := fmt.Sprintf(
+			"failed to analyze %d out of %d files. Continue?",
+			len(failures),
+			len(success)+len(failures),
+		)
+
+		approved, err := AskForApproval(ctx, prompt, interactive)
+		if err != nil {
+			return success, failures, err
+		}
+
+		if !approved {
+			return success, failures, fmt.Errorf(
+				"aborted due to %d analysis failures",
+				len(failures),
+			)
+		}
+		return success, failures, nil
+	}
 }

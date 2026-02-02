@@ -1,7 +1,7 @@
 package data
 
 import (
-	"github.com/UnivocalX/aether/pkg/registry"
+	"github.com/UnivocalX/aether/internal/registry"
 )
 
 type Service struct {

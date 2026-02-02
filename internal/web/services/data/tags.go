@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/UnivocalX/aether/pkg/registry"
+	"github.com/UnivocalX/aether/internal/registry"
 	"gorm.io/gorm"
 )
 

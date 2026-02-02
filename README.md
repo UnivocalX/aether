@@ -36,7 +36,7 @@ Aether simplifies data governance by combining automation, scalability, and inte
 ### From Source
 
 ```bash
-go build -o bin/aether ./cmd/cli
+go build -o bin/aether ./cmd/
 ```
 
 ### Using GoReleaser

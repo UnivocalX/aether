@@ -10,7 +10,7 @@ import (
 	v1 "github.com/UnivocalX/aether/internal/web/api/handlers/v1"
 	"github.com/UnivocalX/aether/internal/web/middleware"
 	"github.com/UnivocalX/aether/internal/web/services/data"
-	"github.com/UnivocalX/aether/pkg/registry"
+	"github.com/UnivocalX/aether/internal/registry"
 )
 
 var (
