@@ -7,9 +7,9 @@ import (
 	"strings"
 )
 
-func AskForApproval(ctx context.Context, prompt string, assumeYes bool) (bool, error) {
-	if assumeYes {
-		return true, nil
+func AskForApproval(ctx context.Context, prompt string, interactive bool) (bool, error) {
+	if !interactive {
+		return false, nil
 	}
 
 	stat, err := os.Stdin.Stat()

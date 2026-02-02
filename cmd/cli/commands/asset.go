@@ -1,9 +1,15 @@
 package commands
 
 import (
-	"github.com/spf13/cobra"
+	"fmt"
+	"time"
 
 	"github.com/UnivocalX/aether/internal/actions"
+	"github.com/spf13/cobra"
+)
+
+const (
+	DefaultTimeoutSeconds = 3600
 )
 
 // AssetsCmd represents the assets command
@@ -13,12 +19,12 @@ var AssetsCmd = &cobra.Command{
 	Run:   func(cmd *cobra.Command, args []string) {},
 }
 
-// buildCmd represents the load command
+// loadCmd represents the load command
 var loadCmd = &cobra.Command{
-	Use:           "load <path> ",
-	Short:         "load assets",
-	Long:          "load assets to aether platform",
-	Example:       "aether assets load data/ ",
+	Use:           "load <path>",
+	Short:         "Load assets",
+	Long:          "Load assets to the Aether platform",
+	Example:       "aether assets load data/",
 	Args:          cobra.MinimumNArgs(1),
 	SilenceUsage:  true,
 	SilenceErrors: true,
@@ -29,10 +35,16 @@ var loadCmd = &cobra.Command{
 }
 
 func runLoadAssets(cmd *cobra.Command, args []string) error {
-	client, err := actions.NewClient(
-		actions.Interactive(),
-	)
+	ci, _ := cmd.Flags().GetBool("ci")
+	timeout, _ := cmd.Flags().GetInt("timeout")
+	endpoint, _ := cmd.Flags().GetString("endpoint")
 
+	client, err := actions.NewClient(
+		actions.WithMode(ci),
+		actions.WithTimeout(time.Duration(timeout)*time.Second),
+		actions.WithEndpoint(endpoint),
+	)
+	
 	if err != nil {
 		return err
 	}
@@ -42,4 +54,6 @@ func runLoadAssets(cmd *cobra.Command, args []string) error {
 
 func init() {
 	AssetsCmd.AddCommand(loadCmd)
+	AssetsCmd.PersistentFlags().Bool("ci", false, "Disable user interaction and progress bars")
+	AssetsCmd.PersistentFlags().Int("timeout", DefaultTimeoutSeconds, fmt.Sprintf("Command timeout in seconds (default: %v)", DefaultTimeoutSeconds))
 }
