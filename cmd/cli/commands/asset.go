@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/UnivocalX/aether/internal/actions"
@@ -40,11 +39,11 @@ func runLoadAssets(cmd *cobra.Command, args []string) error {
 	endpoint, _ := cmd.Flags().GetString("endpoint")
 
 	client, err := actions.NewClient(
-		actions.WithMode(ci),
+		actions.WithMode(!ci),
 		actions.WithTimeout(time.Duration(timeout)*time.Second),
 		actions.WithEndpoint(endpoint),
 	)
-	
+
 	if err != nil {
 		return err
 	}
@@ -55,5 +54,5 @@ func runLoadAssets(cmd *cobra.Command, args []string) error {
 func init() {
 	AssetsCmd.AddCommand(loadCmd)
 	AssetsCmd.PersistentFlags().Bool("ci", false, "Disable user interaction and progress bars")
-	AssetsCmd.PersistentFlags().Int("timeout", DefaultTimeoutSeconds, fmt.Sprintf("Command timeout in seconds (default: %v)", DefaultTimeoutSeconds))
+	AssetsCmd.PersistentFlags().Int("timeout", DefaultTimeoutSeconds, "Command timeout in seconds")
 }
