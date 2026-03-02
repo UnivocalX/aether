@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/UnivocalX/aether/internal/web/api/dto"
-	"github.com/UnivocalX/aether/internal/web/services/data"
+	"github.com/UnivocalX/aether/pkg/web/api/dto"
+	"github.com/UnivocalX/aether/pkg/web/services/data"
 	"github.com/gin-gonic/gin"
 )
 
@@ -29,11 +29,9 @@ func TagAssetHandler(svc *data.Service, ctx *gin.Context) {
 
 	// Success response
 	response := dto.NewResponse(ctx, "tag asset successfully")
-
-	slog.InfoContext(ctx.Request.Context(), response.Message,
+	slog.InfoContext(ctx.Request.Context(), response.Msg,
 		"tagName", uri.TagName,
 		"Checksum", uri.AssetChecksum,
 	)
-
 	response.NoContent(ctx)
 }

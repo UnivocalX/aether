@@ -23,7 +23,7 @@ func NewJSONHandler(level slog.Level, useColors bool) *JSONHandler {
 			Level:     level,
 			AddSource: true, // Always add source for JSON
 		},
-		writer:    os.Stdout,
+		writer:    os.Stderr,
 		attrs:     []slog.Attr{},
 		groups:    []string{},
 		useColors: useColors,

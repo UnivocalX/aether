@@ -6,27 +6,26 @@ import (
 	"net/http"
 	"time"
 
-	dataService "github.com/UnivocalX/aether/internal/web/services/data"
 	"github.com/UnivocalX/aether/internal/registry"
+	dataService "github.com/UnivocalX/aether/pkg/web/services/data"
 	"github.com/gin-gonic/gin"
 )
 
 // Standard API response
 type Response struct {
-	Message string            `json:"message"`
-	Data    any               `json:"data,omitempty"`
-	Meta    *ResponseMetadata `json:"meta,omitempty"`
+	Msg  string            `json:"message"`
+	Meta *ResponseMetadata `json:"meta,omitempty"`
 }
 
 // Error response wrapper
 type ErrorDetails struct {
-	Message string          `json:"message"`
+	Msg string          `json:"message"`
 	Details *map[string]any `json:"details,omitempty"`
 }
 
 type ErrorResponse struct {
-	Message string            `json:"message"`
-	Error   *ErrorDetails     `json:"error"`
+	Msg string            `json:"message"`
+	Err   *ErrorDetails     `json:"error"`
 	Meta    *ResponseMetadata `json:"meta,omitempty"`
 }
 
@@ -39,24 +38,19 @@ type ResponseMetadata struct {
 
 func NewResponse(c *gin.Context, msg string) *Response {
 	return &Response{
-		Message: msg,
-		Meta:    buildMeta(c),
+		Msg:  msg,
+		Meta: buildMeta(c),
 	}
 }
 
 func NewErrorResponse(c *gin.Context, msg string, err error) *ErrorResponse {
 	return &ErrorResponse{
-		Message: msg,
-		Error: &ErrorDetails{
-			Message: err.Error(),
+		Msg: msg,
+		Err: &ErrorDetails{
+			Msg: err.Error(),
 		},
 		Meta: buildMeta(c),
 	}
-}
-
-func (r *Response) WithData(data any) *Response {
-	r.Data = data
-	return r
 }
 
 func buildMeta(c *gin.Context) *ResponseMetadata {
@@ -92,8 +86,8 @@ func HandleErrorResponse(ctx *gin.Context, msg string, err error) {
 
 	switch {
 	case errors.As(err, &maxBytesError):
-		response.Error.Message = maxBytesError.Error()
-		response.Error.Details = &map[string]any{
+		response.Err.Msg = maxBytesError.Error()
+		response.Err.Details = &map[string]any{
 			"max_bytes": maxBytesError.Limit,
 		}
 		response.ContentTooLarge(ctx)
@@ -108,7 +102,7 @@ func HandleErrorResponse(ctx *gin.Context, msg string, err error) {
 		response.NotFound(ctx)
 
 	case errors.As(err, &assetsExistError):
-		response.Error.Details = &map[string]any{
+		response.Err.Details = &map[string]any{
 			"checksums": assetsExistError.Checksums,
 		}
 		response.Conflict(ctx)

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/UnivocalX/aether/internal/web/api/dto"
-	"github.com/UnivocalX/aether/internal/web/services/data"
+	"github.com/UnivocalX/aether/pkg/web/api/dto"
+	"github.com/UnivocalX/aether/pkg/web/services/data"
 	"github.com/gin-gonic/gin"
 )
 
@@ -25,7 +25,7 @@ func UntagAssetHandler(svc *data.Service, ctx *gin.Context) {
 
 	// Success response
 	response := dto.NewResponse(ctx, "untag asset successfully")
-	slog.InfoContext(ctx.Request.Context(), response.Message,
+	slog.InfoContext(ctx.Request.Context(), response.Msg,
 		"tagName", uri.TagName,
 		"assetChecksum", uri.AssetChecksum,
 	)

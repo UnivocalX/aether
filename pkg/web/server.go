@@ -7,9 +7,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	v1 "github.com/UnivocalX/aether/internal/web/api/handlers/v1"
-	"github.com/UnivocalX/aether/internal/web/middleware"
-	"github.com/UnivocalX/aether/internal/web/services/data"
+	v1 "github.com/UnivocalX/aether/pkg/web/api/handlers/v1"
+	"github.com/UnivocalX/aether/pkg/web/middleware"
+	"github.com/UnivocalX/aether/pkg/web/services/data"
 	"github.com/UnivocalX/aether/internal/registry"
 )
 

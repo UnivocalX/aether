@@ -30,7 +30,7 @@ func (l *Log) Apply() {
 	case ServerMode:
 		handler = NewJSONHandler(l.level, l.colored)
 	default:
-		handler = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: l.level})
+		handler = slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: l.level})
 	}
 
 	logger := slog.New(handler)

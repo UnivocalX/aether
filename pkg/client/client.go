@@ -1,4 +1,4 @@
-package actions
+package client
 
 import (
 	"errors"
@@ -56,8 +56,8 @@ func WithMode(interactive bool) Option {
 	}
 }
 
-// NewClient creates a new client with options applied and validated
-func NewClient(opts ...Option) (*Client, error) {
+// New creates a new client with options applied and validated
+func New(opts ...Option) (*Client, error) {
 	c := &Client{
 		endpoint:    DefaultEndpoint,
 		timeout:     DefaultTimeout,

@@ -6,13 +6,14 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/UnivocalX/aether/internal/web/api/dto"
-	"github.com/UnivocalX/aether/internal/web/services/data"
 	"github.com/UnivocalX/aether/internal/registry"
+	"github.com/UnivocalX/aether/pkg/web/api/dto"
+	"github.com/UnivocalX/aether/pkg/web/services/data"
 	"github.com/gin-gonic/gin"
 )
 
-type DetailedAssetResponseData struct {
+type GetAssetResponse struct {
+	dto.Response
 	ID        uint            `json:"id"`
 	Checksum  string          `json:"checksum"`
 	Display   string          `json:"display"`
@@ -44,18 +45,13 @@ func GetAssetHandler(svc *data.Service, ctx *gin.Context) {
 	}
 
 	// Success response
-	data := NewDetailedAssetResponseData(asset)
-	response := dto.NewResponse(ctx, "got asset successfully").WithData(data)
-
-	slog.InfoContext(ctx.Request.Context(), response.Message,
-		"checksum", asset.Checksum,
-	)
-
+	response := newGetAssetResponse(ctx, asset)
 	response.OK(ctx)
 }
 
-func NewDetailedAssetResponseData(asset *registry.Asset) *DetailedAssetResponseData {
-	return &DetailedAssetResponseData{
+func newGetAssetResponse(ctx *gin.Context, asset *registry.Asset) GetAssetResponse {
+	response := GetAssetResponse{
+		Response:  *dto.NewResponse(ctx, "got asset successfully"),
 		ID:        asset.ID,
 		CreatedAt: asset.CreatedAt.Format(time.RFC3339),
 		UpdatedAt: asset.UpdatedAt.Format(time.RFC3339),
@@ -66,4 +62,10 @@ func NewDetailedAssetResponseData(asset *registry.Asset) *DetailedAssetResponseD
 		SizeBytes: asset.SizeBytes,
 		State:     asset.State,
 	}
+
+	slog.InfoContext(ctx.Request.Context(), response.Msg,
+		"checksum", asset.Checksum,
+	)
+
+	return response
 }

@@ -4,14 +4,14 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/UnivocalX/aether/internal/web/api/dto"
-	"github.com/UnivocalX/aether/internal/web/services/data"
 	"github.com/UnivocalX/aether/internal/registry"
+	"github.com/UnivocalX/aether/pkg/web/api/dto"
+	"github.com/UnivocalX/aether/pkg/web/services/data"
 	"github.com/gin-gonic/gin"
 	"gorm.io/datatypes"
 )
 
-type ListAssetsPayload struct {
+type ListAssetsRequest struct {
 	Cursor       uint     `json:"cursor" binding:"omitempty,gte=0"`
 	Limit        uint     `json:"limit" binding:"omitempty,gte=1,lte=1000"`
 	MimeType     string   `json:"mime_type" binding:"omitempty"`
@@ -20,7 +20,14 @@ type ListAssetsPayload struct {
 	ExcludedTags []string `json:"excluded_tags" binding:"omitempty,dive,min=1,max=100"`
 }
 
-type AssetListItem struct {
+type ListAssetsResponse struct {
+	dto.Response
+	Total      int             `json:"total"`
+	NextCursor *uint           `json:"next_cursor,omitempty"`
+	Assets     []*AssetDetails `json:"assets"`
+}
+
+type AssetDetails struct {
 	ID        uint           `json:"id"`
 	Checksum  string         `json:"checksum"`
 	Display   string         `json:"display"`
@@ -31,17 +38,11 @@ type AssetListItem struct {
 	Tags      []string       `json:"tags"`
 }
 
-type AssetsResponseData struct {
-	Total      int              `json:"total"`
-	NextCursor *uint            `json:"next_cursor,omitempty"`
-	Assets     []*AssetListItem `json:"assets"`
-}
-
 func ListAssetsHandler(svc *data.Service, ctx *gin.Context) {
-	var payload ListAssetsPayload
+	var request ListAssetsRequest
 
 	// Bind JSON payload
-	if err := ctx.ShouldBindJSON(&payload); err != nil {
+	if err := ctx.ShouldBindJSON(&request); err != nil {
 		dto.HandleErrorResponse(
 			ctx,
 			"failed to list assets",
@@ -50,58 +51,18 @@ func ListAssetsHandler(svc *data.Service, ctx *gin.Context) {
 		return
 	}
 
-	assets, err := svc.ListAssets(ctx.Request.Context(), ToSearchOptions(&payload)...)
+	assets, err := svc.ListAssets(ctx.Request.Context(), ToSearchOptions(&request)...)
 	if err != nil {
 		dto.HandleErrorResponse(ctx, "failed to list assets", err)
 		return
 	}
 
 	// Success response
-	data := NewAssetsResponseData(assets, payload.Limit)
-	response := dto.NewResponse(ctx, "listed assets successfully").WithData(data)
-
-	slog.InfoContext(ctx.Request.Context(), response.Message,
-		"total", len(assets),
-	)
-
+	response := newListAssetsResponse(ctx, assets, request.Limit)
 	response.OK(ctx)
 }
 
-func NewAssetsResponseData(assets []*registry.Asset, limit uint) *AssetsResponseData {
-	items := make([]*AssetListItem, 0, len(assets))
-
-	for _, asset := range assets {
-		tags := make([]string, 0, len(asset.Tags))
-		for _, tag := range asset.Tags {
-			tags = append(tags, tag.Name)
-		}
-
-		items = append(items, &AssetListItem{
-			ID:        asset.ID,
-			Checksum:  asset.Checksum,
-			Display:   asset.Display,
-			Extra:     asset.Extra,
-			MimeType:  asset.MimeType,
-			SizeBytes: asset.SizeBytes,
-			State:     string(asset.State),
-			Tags:      tags,
-		})
-	}
-
-	var nextCursor *uint
-	// Only include next_cursor if we got a full page (might be more)
-	if len(assets) == int(limit) && len(assets) > 0 {
-		nextCursor = &assets[len(assets)-1].ID
-	}
-
-	return &AssetsResponseData{
-		Total:      len(assets),
-		Assets:     items,
-		NextCursor: nextCursor,
-	}
-}
-
-func ToSearchOptions(req *ListAssetsPayload) []registry.SearchAssetsOption {
+func ToSearchOptions(req *ListAssetsRequest) []registry.SearchAssetsOption {
 	var opts []registry.SearchAssetsOption
 
 	// Helper to conditionally add options
@@ -119,4 +80,43 @@ func ToSearchOptions(req *ListAssetsPayload) []registry.SearchAssetsOption {
 	addIfSet(len(req.ExcludedTags) > 0, registry.WithExcludedTags(req.ExcludedTags...))
 
 	return opts
+}
+
+func newListAssetsResponse(ctx *gin.Context, assets []*registry.Asset, limit uint) ListAssetsResponse {
+	items := make([]*AssetDetails, 0, len(assets))
+
+	for _, asset := range assets {
+		tags := make([]string, 0, len(asset.Tags))
+		for _, tag := range asset.Tags {
+			tags = append(tags, tag.Name)
+		}
+
+		items = append(items, &AssetDetails{
+			ID:        asset.ID,
+			Checksum:  asset.Checksum,
+			Display:   asset.Display,
+			Extra:     asset.Extra,
+			MimeType:  asset.MimeType,
+			SizeBytes: asset.SizeBytes,
+			State:     string(asset.State),
+			Tags:      tags,
+		})
+	}
+
+	var nextCursor *uint
+	// Only include next_cursor if we got a full page (might be more)
+	if len(assets) == int(limit) && len(assets) > 0 {
+		nextCursor = &assets[len(assets)-1].ID
+	}
+
+	response := ListAssetsResponse{
+		Response:   *dto.NewResponse(ctx, "listed assets successfully"),
+		Total:      len(assets),
+		Assets:     items,
+		NextCursor: nextCursor,
+	}
+	slog.InfoContext(ctx.Request.Context(), response.Msg,
+		"total", len(assets),
+	)
+	return response
 }

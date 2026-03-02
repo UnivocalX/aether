@@ -4,24 +4,26 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/UnivocalX/aether/internal/web/api/dto"
-	"github.com/UnivocalX/aether/internal/web/services/data"
+	"github.com/UnivocalX/aether/internal/registry"
+	"github.com/UnivocalX/aether/pkg/web/api/dto"
+	"github.com/UnivocalX/aether/pkg/web/services/data"
 	"github.com/gin-gonic/gin"
 )
 
-type CreateDatasetPayload struct {
+type CreateDatasetRequest struct {
 	Name        string `json:"name" binding:"required,max=100"`
 	Description string `json:"description" binding:"omitempty,max=1000"`
 }
 
-type CreateDatasetResponseData struct {
+type CreateDatasetResponse struct {
+	dto.Response
 	ID          uint   `json:"id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
 }
 
 func CreateDatasetHandler(svc *data.Service, ctx *gin.Context) {
-	var payload CreateDatasetPayload
+	var payload CreateDatasetRequest
 
 	// Bind JSON payload
 	if err := ctx.ShouldBindJSON(&payload); err != nil {
@@ -39,17 +41,19 @@ func CreateDatasetHandler(svc *data.Service, ctx *gin.Context) {
 		return
 	}
 
-	data := &CreateDatasetResponseData{
+	response := newCreateDatasetResponse(ctx, dsv)
+	response.Created(ctx)
+}
+
+func newCreateDatasetResponse(ctx *gin.Context, dsv *registry.DatasetVersion) CreateDatasetResponse {
+	response := CreateDatasetResponse{
+		Response:    *dto.NewResponse(ctx, "dataset created successfully"),
 		ID:          dsv.DatasetID,
 		Name:        dsv.Dataset.Name,
 		Description: dsv.Dataset.Description,
 	}
-	response := dto.NewResponse(ctx, "dataset created successfully").WithData(data)
-
-	// Success response
-	slog.InfoContext(ctx.Request.Context(), response.Message,
+	slog.InfoContext(ctx.Request.Context(), response.Msg,
 		"dataset", dsv,
 	)
-
-	response.Created(ctx)
+	return response
 }

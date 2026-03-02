@@ -1,4 +1,4 @@
-package actions
+package client
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-func AskForApproval(ctx context.Context, prompt string, interactive bool) (bool, error) {
+func Input(ctx context.Context, prompt string, interactive bool) (bool, error) {
 	if !interactive {
 		return false, nil
 	}

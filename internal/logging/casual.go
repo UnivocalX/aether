@@ -22,13 +22,13 @@ type CasualHandler struct {
 func NewCliHandler(level slog.Level) *CasualHandler {
 	return &CasualHandler{
 		Handler: slog.NewTextHandler(
-			os.Stdout, 
+			os.Stderr, 
 			&slog.HandlerOptions{
 				Level:     level,
 				AddSource: level == slog.LevelDebug,
 			},
 		),
-		logger: log.New(os.Stdout, "", 0),
+		logger: log.New(os.Stderr, "", 0),
 		level:  level,
 	}
 }

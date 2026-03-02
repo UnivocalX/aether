@@ -8,5 +8,4 @@ import (
 var TagsCmd = &cobra.Command{
 	Use:   "tags",
 	Short: "Manage and interact with data tags.",
-	Run:   func(cmd *cobra.Command, args []string) {},
 }

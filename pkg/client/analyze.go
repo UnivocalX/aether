@@ -1,4 +1,4 @@
-package actions
+package client
 
 import (
 	"context"
@@ -16,16 +16,16 @@ import (
 	"github.com/schollz/progressbar/v3"
 )
 
-// FileChecksum represents a file and its SHA256 checksum.
-type FileChecksum struct {
+// fileAnalysis represents a file and its SHA256 checksum.
+type fileAnalysis struct {
 	Path     string `yaml:"path"`
 	Checksum string `yaml:"checksum" binding:"required,len=64,hexadecimal"`
 }
 
 // Analyze a single file and return its FileChecksum.
-func analyzeFile(path string) (FileChecksum, error) {
+func analyzeFile(path string) (fileAnalysis, error) {
 	slog.Debug("analyzing file", "path", path)
-	fc := FileChecksum{Path: path}
+	fc := fileAnalysis{Path: path}
 
 	// resolve abs path
 	abs, err := filepath.Abs(path)
@@ -63,11 +63,9 @@ func checksum(path string) (string, error) {
 	return hex.EncodeToString(hasher.Sum(nil)), nil
 }
 
-func analyzePipeline(ctx context.Context, paths []string, progress bool) universe.Stream[FileChecksum] {
+func analyzePipeline(ctx context.Context, paths []string, progress bool) universe.Stream[fileAnalysis] {
 	slog.Info("starting to analyze paths...", "total", len(paths))
-	fmt.Printf("\n")
 
-	// transform path string to FileChecksum
 	analyzer := universe.TransformValue(analyzeFile)
 
 	// create progress bar
@@ -78,46 +76,52 @@ func analyzePipeline(ctx context.Context, paths []string, progress bool) univers
 		progressbar.OptionSetVisibility(progress),
 		progressbar.OptionSetWriter(os.Stderr),
 		progressbar.OptionShowCount(),
+		progressbar.OptionEnableColorCodes(true),
+		progressbar.OptionClearOnFinish(),
 		progressbar.OptionOnCompletion(func() {
 			defer fmt.Printf("\n")
 		}),
 	)
 
+	if progress {
+		fmt.Fprintln(os.Stdout)
+		bar.RenderBlank()
+		bar.Clear()
+	}
+
 	// handle progress bar progress
-	barHandler := func(meta *universe.Meta, env universe.Envelope[FileChecksum]) {
+	barHandler := func(meta *universe.Meta, env universe.Envelope[fileAnalysis]) {
 		if env.Err != nil {
 			slog.Error("analyze failed", "error", env.Err)
 		}
-
 		bar.Add(1)
 	}
 
 	// build pipeline
 	source := universe.From(ctx, paths...)
-	pipeline := universe.Map(source, analyzer, 8).Tap(barHandler, 1)
-	return pipeline.Run(ctx)
+	return universe.Map(source, analyzer, 8).Tap(barHandler, 1).Run(ctx)
 }
 
 func handleAnalysisResult(
 	ctx context.Context,
-	stream universe.Stream[FileChecksum],
+	stream universe.Stream[fileAnalysis],
 	interactive bool,
-) (success, failure []universe.Envelope[FileChecksum], err error) {
+) (success, failure []universe.Envelope[fileAnalysis], err error) {
 	success, failures, err := universe.Partition(ctx, stream.Data)
 
 	switch {
 	// failed to partition (ctx errors)
 	case err != nil:
 		return success, failures, err
-	
+
 	// no success
 	case len(success) == 0:
 		return success, failures, fmt.Errorf("no files were successfully analyzed")
-	
+
 	// no failures
 	case len(failures) == 0:
 		return success, failures, nil
-	
+
 	// failed analyze some files
 	default:
 		prompt := fmt.Sprintf(
@@ -126,7 +130,7 @@ func handleAnalysisResult(
 			len(success)+len(failures),
 		)
 
-		approved, err := AskForApproval(ctx, prompt, interactive)
+		approved, err := Input(ctx, prompt, interactive)
 		if err != nil {
 			return success, failures, err
 		}

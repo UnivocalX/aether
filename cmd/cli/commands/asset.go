@@ -3,7 +3,7 @@ package commands
 import (
 	"time"
 
-	"github.com/UnivocalX/aether/internal/actions"
+	"github.com/UnivocalX/aether/pkg/client"
 	"github.com/spf13/cobra"
 )
 
@@ -15,7 +15,6 @@ const (
 var AssetsCmd = &cobra.Command{
 	Use:   "assets",
 	Short: "Manage and interact with data assets.",
-	Run:   func(cmd *cobra.Command, args []string) {},
 }
 
 // loadCmd represents the load command
@@ -33,26 +32,26 @@ var loadCmd = &cobra.Command{
 	RunE: runLoadAssets,
 }
 
+func init() {
+	AssetsCmd.AddCommand(loadCmd)
+	AssetsCmd.PersistentFlags().Bool("ci", false, "Disable user interaction and progress bars")
+	AssetsCmd.PersistentFlags().Int("timeout", DefaultTimeoutSeconds, "Command timeout in seconds")
+}
+
 func runLoadAssets(cmd *cobra.Command, args []string) error {
 	ci, _ := cmd.Flags().GetBool("ci")
 	timeout, _ := cmd.Flags().GetInt("timeout")
 	endpoint, _ := cmd.Flags().GetString("endpoint")
 
-	client, err := actions.NewClient(
-		actions.WithMode(!ci),
-		actions.WithTimeout(time.Duration(timeout)*time.Second),
-		actions.WithEndpoint(endpoint),
+	aether, err := client.New(
+		client.WithMode(!ci),
+		client.WithTimeout(time.Duration(timeout)*time.Second),
+		client.WithEndpoint(endpoint),
 	)
 
 	if err != nil {
 		return err
 	}
 
-	return client.LoadAssets(args[0])
-}
-
-func init() {
-	AssetsCmd.AddCommand(loadCmd)
-	AssetsCmd.PersistentFlags().Bool("ci", false, "Disable user interaction and progress bars")
-	AssetsCmd.PersistentFlags().Int("timeout", DefaultTimeoutSeconds, "Command timeout in seconds")
+	return aether.LoadAssets(args[0])
 }

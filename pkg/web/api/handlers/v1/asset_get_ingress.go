@@ -5,13 +5,14 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/UnivocalX/aether/internal/web/api/dto"
-	"github.com/UnivocalX/aether/internal/web/services/data"
 	"github.com/UnivocalX/aether/internal/registry"
+	"github.com/UnivocalX/aether/pkg/web/api/dto"
+	"github.com/UnivocalX/aether/pkg/web/services/data"
 	"github.com/gin-gonic/gin"
 )
 
-type AssetIngressResponseData struct {
+type AssetIngressResponse struct {
+	dto.Response
 	Checksum  string     `json:"checksum"`
 	UploadURL string     `json:"upload_url,omitempty"`
 	ExpiresAt *time.Time `json:"expires_at,omitempty"`
@@ -38,20 +39,19 @@ func GetAssetIngressHandler(svc *data.Service, ctx *gin.Context) {
 	}
 
 	// Success response
-	data := NewAssetIngressResponseData(ingressUrl)
-	response := dto.NewResponse(ctx, "got asset ingress url successfully").WithData(data)
-
-	slog.InfoContext(ctx.Request.Context(), response.Message,
-		"checksum", uri.AssetChecksum,
-	)
-
+	response := newAssetIngressResponse(ctx, ingressUrl)
 	response.OK(ctx)
 }
 
-func NewAssetIngressResponseData(presignedUrl *registry.PresignedUrl) *AssetIngressResponseData {
-	return &AssetIngressResponseData{
+func newAssetIngressResponse(ctx *gin.Context, presignedUrl *registry.PresignedUrl) AssetIngressResponse {
+	response := AssetIngressResponse{
+		Response: *dto.NewResponse(ctx, "got asset ingress url successfully"),
 		Checksum:  presignedUrl.Checksum,
 		UploadURL: presignedUrl.URL.Value(),
 		ExpiresAt: &presignedUrl.ExpiresAt,
 	}
+	slog.InfoContext(ctx.Request.Context(), response.Msg,
+		"checksum", presignedUrl.Checksum,
+	)
+	return response
 }

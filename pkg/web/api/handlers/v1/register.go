@@ -3,7 +3,7 @@ package v1
 import (
 	"log/slog"
 
-	"github.com/UnivocalX/aether/internal/web/services/data"
+	"github.com/UnivocalX/aether/pkg/web/services/data"
 	"github.com/gin-gonic/gin"
 )
 

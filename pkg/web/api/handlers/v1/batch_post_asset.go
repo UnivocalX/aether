@@ -5,11 +5,15 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/UnivocalX/aether/internal/web/api/dto"
-	"github.com/UnivocalX/aether/internal/web/services/data"
 	"github.com/UnivocalX/aether/internal/registry"
+	"github.com/UnivocalX/aether/pkg/web/api/dto"
+	"github.com/UnivocalX/aether/pkg/web/services/data"
 	"github.com/gin-gonic/gin"
 )
+
+type CreateAssetsBatchRequest struct {
+	Assets []AssetPayload `json:"assets" binding:"required,max=1000,dive"`
+}
 
 type AssetPayload struct {
 	Checksum string         `json:"checksum" binding:"required,len=64,hexadecimal"`
@@ -17,11 +21,12 @@ type AssetPayload struct {
 	Extra    map[string]any `json:"extra" binding:"omitempty"`
 }
 
-type CreateAssetsBatchPayload struct {
-	Assets []AssetPayload `json:"assets" binding:"required,max=1000,dive"`
+type AssetsBatchResponse struct {
+	dto.Response
+	Assets []*BatchAssetDetails
 }
 
-type BatchAsset struct {
+type BatchAssetDetails struct {
 	ID         uint       `json:"id"`
 	Checksum   string     `json:"checksum"`
 	State      string     `json:"state"`
@@ -29,15 +34,11 @@ type BatchAsset struct {
 	ExpiresAt  *time.Time `json:"expires_at,omitempty"`
 }
 
-type AssetsBatchResponseData struct {
-	Assets []*BatchAsset
-}
-
 func CreateAssetsBatchHandler(svc *data.Service, ctx *gin.Context) {
-	var payload CreateAssetsBatchPayload
+	var request CreateAssetsBatchRequest
 
 	// Bind JSON payload
-	if err := ctx.ShouldBindJSON(&payload); err != nil {
+	if err := ctx.ShouldBindJSON(&request); err != nil {
 		dto.HandleErrorResponse(
 			ctx,
 			"failed to execute batch",
@@ -47,7 +48,7 @@ func CreateAssetsBatchHandler(svc *data.Service, ctx *gin.Context) {
 	}
 
 	// Convert request to records
-	assets, err := assetsBatchToRecords(&payload)
+	assets, err := assetsBatchToRecords(&request)
 	if err != nil {
 		dto.HandleErrorResponse(
 			ctx,
@@ -64,54 +65,11 @@ func CreateAssetsBatchHandler(svc *data.Service, ctx *gin.Context) {
 	}
 
 	// Success response
-	data := NewAssetsBatchResponseData(assets, ingressUrls)
-	response := dto.NewResponse(ctx, "successfully executed batch").WithData(data)
-	slog.InfoContext(ctx.Request.Context(), response.Message,
-		"total", len(assets),
-	)
-
+	response := newAssetsBatchResponse(ctx, assets, ingressUrls)
 	response.Created(ctx)
 }
 
-func NewBatchAsset(asset *registry.Asset, uploadURL *registry.PresignedUrl) *BatchAsset {
-	response := &BatchAsset{
-		ID:       asset.ID,
-		Checksum: asset.Checksum,
-		State:    string(asset.State),
-	}
-
-	if uploadURL != nil {
-		response.IngressUrl = uploadURL.URL.Value()
-		response.ExpiresAt = &uploadURL.ExpiresAt
-	}
-
-	return response
-}
-
-func NewAssetsBatchResponseData(
-	assets []*registry.Asset,
-	urls []*registry.PresignedUrl,
-) *AssetsBatchResponseData {
-
-	// Build lookup map: checksum → presigned URL
-	urlMap := make(map[string]*registry.PresignedUrl, len(urls))
-	for _, u := range urls {
-		urlMap[u.Checksum] = u
-	}
-
-	// Build response assets
-	batchAssets := make([]*BatchAsset, len(assets))
-	for i, a := range assets {
-		uploadURL := urlMap[a.Checksum] // may be nil if no URL exists
-		batchAssets[i] = NewBatchAsset(a, uploadURL)
-	}
-
-	return &AssetsBatchResponseData{
-		Assets: batchAssets,
-	}
-}
-
-func assetsBatchToRecords(payload *CreateAssetsBatchPayload) ([]*registry.Asset, error) {
+func assetsBatchToRecords(payload *CreateAssetsBatchRequest) ([]*registry.Asset, error) {
 	records := make([]*registry.Asset, len(payload.Assets))
 
 	for i, asset := range payload.Assets {
@@ -130,4 +88,48 @@ func assetsBatchToRecords(payload *CreateAssetsBatchPayload) ([]*registry.Asset,
 	}
 
 	return records, nil
+}
+
+func newBatchAssetDetails(asset *registry.Asset, uploadURL *registry.PresignedUrl) *BatchAssetDetails {
+	response := &BatchAssetDetails{
+		ID:       asset.ID,
+		Checksum: asset.Checksum,
+		State:    string(asset.State),
+	}
+
+	if uploadURL != nil {
+		response.IngressUrl = uploadURL.URL.Value()
+		response.ExpiresAt = &uploadURL.ExpiresAt
+	}
+
+	return response
+}
+
+func newAssetsBatchResponse(
+	ctx *gin.Context,
+	assets []*registry.Asset,
+	urls []*registry.PresignedUrl,
+) AssetsBatchResponse {
+
+	// Build lookup map: checksum → presigned URL
+	urlMap := make(map[string]*registry.PresignedUrl, len(urls))
+	for _, u := range urls {
+		urlMap[u.Checksum] = u
+	}
+
+	// Build response assets
+	batchAssets := make([]*BatchAssetDetails, len(assets))
+	for i, a := range assets {
+		uploadURL := urlMap[a.Checksum] // may be nil if no URL exists
+		batchAssets[i] = newBatchAssetDetails(a, uploadURL)
+	}
+
+	response := AssetsBatchResponse{
+		Response: *dto.NewResponse(ctx, "successfully executed batch"),
+		Assets:   batchAssets,
+	}
+	slog.InfoContext(ctx.Request.Context(), response.Msg,
+		"total", len(assets),
+	)
+	return response
 }

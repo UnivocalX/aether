@@ -4,13 +4,14 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/UnivocalX/aether/internal/web/api/dto"
-	"github.com/UnivocalX/aether/internal/web/services/data"
 	"github.com/UnivocalX/aether/internal/registry"
+	"github.com/UnivocalX/aether/pkg/web/api/dto"
+	"github.com/UnivocalX/aether/pkg/web/services/data"
 	"github.com/gin-gonic/gin"
 )
 
-type AssetTagsResponseData struct {
+type AssetTagsResponse struct {
+	dto.Response
 	Total int      `json:"total"`
 	Tags  []string `json:"tags"`
 }
@@ -35,26 +36,25 @@ func ListAssetTagsHandler(svc *data.Service, ctx *gin.Context) {
 	}
 
 	// Success response
-	data := NewAssetTagsResponseData(tags)
-	response := dto.NewResponse(ctx, "got asset tags successfully").WithData(data)
-
-	slog.InfoContext(ctx.Request.Context(), response.Message,
-		"checksum", uri.AssetChecksum,
-		"total", len(tags),
-	)
-
+	response := newAssetTagsResponse(ctx, tags)
 	response.OK(ctx)
 }
 
-func NewAssetTagsResponseData(tags []*registry.Tag) *AssetTagsResponseData {
+func newAssetTagsResponse(ctx *gin.Context, tags []*registry.Tag) AssetTagsResponse {
 	tagsNames := make([]string, len(tags))
 
 	for i, tag := range tags {
 		tagsNames[i] = tag.Name
 	}
 
-	return &AssetTagsResponseData{
+	response := AssetTagsResponse{
+		Response: *dto.NewResponse(ctx, "got asset tags successfully"),
 		Total: len(tagsNames),
 		Tags:  tagsNames,
 	}
+	slog.InfoContext(ctx.Request.Context(), response.Msg,
+		"total", len(tags),
+	)
+
+	return response
 }

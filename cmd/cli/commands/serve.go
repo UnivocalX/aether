@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/UnivocalX/aether/internal/logging"
-	"github.com/UnivocalX/aether/internal/web"
+	"github.com/UnivocalX/aether/pkg/web"
 	"github.com/UnivocalX/aether/internal/registry"
 )
 
