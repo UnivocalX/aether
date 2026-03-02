@@ -3,47 +3,96 @@ package client
 import (
 	"errors"
 	"fmt"
+	"net"
+	"net/http"
 	"net/url"
 	"time"
 )
 
 const (
-	DefaultEndpoint = "http://localhost:8080"
-	DefaultTimeout  = 30 * time.Minute
-	MinTimeout      = 1 * time.Second
-	MaxTimeout      = 24 * time.Hour
+	DefaultScheme  = "http"
+	DefaultHost    = "localhost:8080"
+	DefaultPath    = "/health"
+	MinTimeout     = 1 * time.Second
+	MaxTimeout     = 24 * time.Hour
 )
 
 type Client struct {
-	endpoint    string
-	timeout     time.Duration
 	interactive bool
+	url  *url.URL
+	http *http.Client
+}
+
+// New creates a new client with options applied and validated
+func New(opts ...Option) (*Client, error) {
+	c := &Client{
+		interactive: false,
+		url: &url.URL{
+			Scheme: DefaultScheme,
+			Host:   DefaultHost,
+			Path:   DefaultPath,
+		},
+		http: &http.Client{
+			Transport: &http.Transport{
+
+				// Connection Pool
+				MaxIdleConns:        500,
+				MaxIdleConnsPerHost: 200,
+				MaxConnsPerHost:     300,
+
+				// Timeouts
+				IdleConnTimeout:       90 * time.Second,
+				TLSHandshakeTimeout:   5 * time.Second,
+				ExpectContinueTimeout: 1 * time.Second,
+				ResponseHeaderTimeout: 10 * time.Second,
+
+				// Dialer (important under load)
+				DialContext: (&net.Dialer{
+					Timeout:   5 * time.Second,
+					KeepAlive: 30 * time.Second,
+				}).DialContext,
+
+				// Avoid connection churn
+				ForceAttemptHTTP2: true,
+			},
+			Timeout: 30 * time.Second,
+		},
+	}
+
+	for _, opt := range opts {
+		if err := opt(c); err != nil {
+			return nil, fmt.Errorf("failed to apply option: %w", err)
+		}
+	}
+
+	// parse and validate url
+	if _, e := url.Parse(c.url.String()); e != nil {
+		return nil, e
+	}
+
+	return c, nil
 }
 
 type Option func(*Client) error
 
-// WithTimeout sets a timeout and validates it
-func WithTimeout(timeout time.Duration) Option {
+// WithHost sets the API host and validates it
+func WithHost(h string) Option {
 	return func(c *Client) error {
-		if timeout < MinTimeout || timeout > MaxTimeout {
-			return fmt.Errorf("timeout must be between %v and %v", MinTimeout, MaxTimeout)
+		if h == "" {
+			return errors.New("host cannot be empty")
 		}
-		c.timeout = timeout
+		c.url.Host = h
 		return nil
 	}
 }
 
-// WithEndpoint sets the API endpoint and validates it
-func WithEndpoint(endpoint string) Option {
+// WithHost sets the API host and validates it
+func WithScheme(s string) Option {
 	return func(c *Client) error {
-		if endpoint == "" {
-			return errors.New("endpoint cannot be empty")
+		if s == "" {
+			return errors.New("scheme cannot be empty")
 		}
-		// Simple URL parse validation
-		if _, err := url.ParseRequestURI(endpoint); err != nil {
-			return fmt.Errorf("invalid endpoint URL: %w", err)
-		}
-		c.endpoint = endpoint
+		c.url.Scheme = s
 		return nil
 	}
 }
@@ -56,19 +105,3 @@ func WithMode(interactive bool) Option {
 	}
 }
 
-// New creates a new client with options applied and validated
-func New(opts ...Option) (*Client, error) {
-	c := &Client{
-		endpoint:    DefaultEndpoint,
-		timeout:     DefaultTimeout,
-		interactive: false,
-	}
-
-	for _, opt := range opts {
-		if err := opt(c); err != nil {
-			return nil, fmt.Errorf("failed to apply option: %w", err)
-		}
-	}
-
-	return c, nil
-}

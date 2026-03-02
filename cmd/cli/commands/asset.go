@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"time"
 
 	"github.com/UnivocalX/aether/pkg/client"
@@ -41,17 +42,24 @@ func init() {
 func runLoadAssets(cmd *cobra.Command, args []string) error {
 	ci, _ := cmd.Flags().GetBool("ci")
 	timeout, _ := cmd.Flags().GetInt("timeout")
-	endpoint, _ := cmd.Flags().GetString("endpoint")
+	host, _ := cmd.Flags().GetString("host")
 
+	// create aether client
 	aether, err := client.New(
 		client.WithMode(!ci),
-		client.WithTimeout(time.Duration(timeout)*time.Second),
-		client.WithEndpoint(endpoint),
+		client.WithHost(host),
 	)
 
 	if err != nil {
 		return err
 	}
 
-	return aether.LoadAssets(args[0])
+	// run analyze
+	ctx, cancel := context.WithTimeout(
+		context.Background(),
+		time.Duration(timeout)*time.Second,
+	)
+	defer cancel()
+
+	return aether.LoadAssets(ctx, args[0])
 }

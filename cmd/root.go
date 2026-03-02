@@ -23,7 +23,7 @@ const (
 var (
 	cfgFile  string
 	logLevel string
-	endpoint string
+	host string
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -56,7 +56,7 @@ func init() {
 	// Define persistent flags
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.aether/config.yaml)")
 	rootCmd.PersistentFlags().StringVar(&logLevel, "level", "info", "log level (debug, info, warn, error)")
-	rootCmd.PersistentFlags().StringVar(&endpoint, "endpoint", "localhost:8080", "aether API endpoint")
+	rootCmd.PersistentFlags().StringVar(&host, "host", "localhost:8080", "aether API host.")
 
 	// Set bash completion for log level
 	if err := rootCmd.PersistentFlags().SetAnnotation("level", cobra.BashCompOneRequiredFlag, []string{"debug", "info", "warn", "error"}); err != nil {
@@ -78,7 +78,7 @@ func initConfig(cmd *cobra.Command, args []string) error {
 	slog.Debug("configuration loaded",
 		"configFile", viper.ConfigFileUsed(),
 		"level", viper.GetString("level"),
-		"endpoint", viper.GetString("endpoint"),
+		"host", viper.GetString("host"),
 	)
 
 	return nil

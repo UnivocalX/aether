@@ -1,21 +1,25 @@
 package client
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net/http"
 
 	"path/filepath"
 
-	v1 "github.com/UnivocalX/aether/pkg/web/api/handlers/v1"
 	"github.com/UnivocalX/aether/pkg/universe"
+	"github.com/UnivocalX/aether/pkg/web/api/dto"
+	v1 "github.com/UnivocalX/aether/pkg/web/api/handlers/v1"
 )
 
 const (
 	BatchSize = 1000
 )
 
-func (c *Client) LoadAssets(pattern string) error {
+func (c *Client) LoadAssets(ctx context.Context, pattern string) error {
 	slog.Info("starting to load files as assets", "pattern", pattern)
 
 	// find matches
@@ -28,10 +32,7 @@ func (c *Client) LoadAssets(pattern string) error {
 	}
 	slog.Info("found candidates", "total", len(matches))
 
-	// run analyze
-	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
-	defer cancel()
-
+	// analyze candidates
 	stream := analyzePipeline(ctx, matches, c.interactive)
 	success, _, err := handleAnalysisResult(ctx, stream, c.interactive)
 	if err != nil {
@@ -39,14 +40,15 @@ func (c *Client) LoadAssets(pattern string) error {
 	}
 
 	// post assets in batches
-	submitAssets(success)
+	analysis := envelopesToAnalysis(success...)
+	c.postAssets(ctx, analysis)
 
 	slog.Info("successfully loaded assets", "total", len(success))
 	return nil
 }
 
-func submitAssets(analysis []universe.Envelope[fileAnalysis]) {
-	slog.Info("submitting new assets")
+func (c *Client) postAssets(ctx context.Context, analysis []fileAnalysis) error {
+	slog.Info("posting new assets")
 
 	// submit in batches
 	for start := 0; start < len(analysis); start += BatchSize {
@@ -56,29 +58,51 @@ func submitAssets(analysis []universe.Envelope[fileAnalysis]) {
 			end = len(analysis)
 		}
 
-		batchEnvelopes := analysis[start:end]
-		files := make([]fileAnalysis, len(batchEnvelopes))
-		for i, env := range batchEnvelopes {
-			files[i] = env.Value
+		batch := analysis[start:end]
+		response, err := c.postAssetsBatch(ctx, batch)
+		if err != nil {
+			return err
 		}
-
-		request, err := newAssetsBatchRequest(files)
 	}
 }
 
-// create new assets batch request
-func newAssetsBatchRequest(files []fileAnalysis) (*v1.AssetsBatchResponse, error) {
-	var request v1.CreateAssetsBatchRequest
-	assets := make([]v1.AssetPayload, len(files))
-
-	for i, f := range files {
-		asset := v1.AssetPayload{
+func (c *Client) postAssetsBatch(ctx context.Context, analysis []fileAnalysis) (*v1.AssetsBatchResponse, error) {
+	assets := make([]v1.AssetPayload, len(analysis))
+	for i, f := range analysis {
+		assets[i] = v1.AssetPayload{
 			Checksum: f.Checksum,
 			Display:  filepath.Base(f.Path),
 		}
-		assets[i] = asset
 	}
-	request.Assets = assets
 
-	return nil, nil
+	b, err := json.Marshal(v1.CreateAssetsBatchRequest{Assets: assets})
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.post(ctx, "/batch/assets", bytes.NewReader(b))
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, decodeErrorResponse(resp)
+	}
+
+	var response v1.AssetsBatchResponse
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, err
+	}
+
+	return &response, nil
+}
+
+func envelopesToAnalysis(envelopes ...universe.Envelope[fileAnalysis]) []fileAnalysis {
+	slog.Debug("extracting analysis from envelopes")
+	var analysis []fileAnalysis
+	for _, env := range envelopes {
+		analysis = append(analysis, env.Value)
+	}
+	return analysis
 }

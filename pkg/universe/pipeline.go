@@ -23,7 +23,7 @@ type Envelope[T any] struct {
 	Value T
 	Err   error
 }
-
+ 
 // Meta holds attributes and tracks errors during pipeline execution.
 type Meta struct {
 	OriginTotalItems int
