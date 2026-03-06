@@ -26,7 +26,7 @@ func (e MultiError) Error() string {
 }
 
 type AssetsExistsError struct {
-	Checksums []*string
+	Checksums []string
 }
 
 func (e AssetsExistsError) Error() string {

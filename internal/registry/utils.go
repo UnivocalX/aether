@@ -1,7 +1,6 @@
 package registry
 
-
-func AssetsToChecksums(assets ...*Asset) []*string {
+func Assets2Checksums(assets ...*Asset) []*string {
 	checksums := make([]*string, len(assets))
 
 	for i, a := range assets {

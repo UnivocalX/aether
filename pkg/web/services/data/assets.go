@@ -112,32 +112,51 @@ func (s *Service) CreateAssets(ctx context.Context, assets ...*registry.Asset) (
 
 	// Try to create
 	if err := s.engine.CreateAssetRecords(assets...); err != nil {
-		// If duplicate error -> fetch existing records and return them
+		// duplicate error
 		if IsUniqueConstraintError(err) {
+			// fetch existing records
 			checksums := make([]string, len(assets))
 			for i, a := range assets {
 				checksums[i] = a.Checksum
 			}
 
-			existing, listErr := s.engine.ListAssetsRecords(registry.WithChecksums(checksums...))
+			records, listErr := s.engine.ListAssetsRecords(registry.WithChecksums(checksums...))
 			if listErr != nil {
-				return nil, fmt.Errorf("failed to fetch existing assets after duplicate: %w", listErr)
+				return nil, fmt.Errorf("failed to fetch existing assets: %w", listErr)
 			}
 
-			return nil, AssetsExistsError{Checksums: registry.AssetsToChecksums(existing...)}
+			// return assets with ready status
+			readyAssets := filterAssetByStatus(registry.StatusReady, records...)
+			if len(readyAssets) > 0 {
+				return nil, AssetsExistsError{Checksums: readyAssets}
+			}
 		}
 		// other errors
 		return nil, err
 	}
 
 	// Generate ingress urls
-	checksums := registry.AssetsToChecksums(assets...)
-	urls, err := s.GenerateIngressUrls(ctx, checksums...)
+	urls, err := s.GenerateIngressUrls(
+		ctx,
+		registry.Assets2Checksums(assets...)...,
+	)
+
 	if err != nil {
 		return nil, err
 	}
 
 	return urls, err
+}
+
+func filterAssetByStatus(status registry.Status, assets ...*registry.Asset) []string {
+	// return assets with ready status
+	matches := make([]string, len(assets))
+	for i, a := range assets {
+		if a.State == status {
+			matches[i] = a.Checksum
+		}
+	}
+	return matches
 }
 
 func (s *Service) GenerateIngressUrls(ctx context.Context, checksums ...*string) ([]*registry.PresignedUrl, error) {

@@ -16,6 +16,11 @@ import (
 	"github.com/schollz/progressbar/v3"
 )
 
+type AnalysisResults struct {
+	failures  map[string]universe.Envelope[fileAnalysis]
+	successes map[string]universe.Envelope[fileAnalysis]
+}
+
 // fileAnalysis represents a file and its SHA256 checksum.
 type fileAnalysis struct {
 	Path     string `yaml:"path"`
@@ -106,41 +111,59 @@ func handleAnalysisResult(
 	ctx context.Context,
 	stream universe.Stream[fileAnalysis],
 	interactive bool,
-) (success, failure []universe.Envelope[fileAnalysis], err error) {
-	success, failures, err := universe.Partition(ctx, stream.Data)
+) (AnalysisResults, error) {
+	successList, failureList, err := universe.Partition(ctx, stream.Data)
+
+	successes := make(map[string]universe.Envelope[fileAnalysis], len(successList))
+	for _, env := range successList {
+		successes[env.Value.Checksum] = env
+	}
+
+	failures := make(map[string]universe.Envelope[fileAnalysis], len(failureList))
+	for _, env := range failureList {
+		failures[env.Value.Path] = env
+	}
+
+	result := AnalysisResults{
+		successes: successes,
+		failures:  failures,
+	}
 
 	switch {
-	// failed to partition (ctx errors)
 	case err != nil:
-		return success, failures, err
+		return result, err
 
-	// no success
-	case len(success) == 0:
-		return success, failures, fmt.Errorf("no files were successfully analyzed")
+	case len(successes) == 0:
+		return result, fmt.Errorf("no files were successfully analyzed")
 
-	// no failures
 	case len(failures) == 0:
-		return success, failures, nil
+		return result, nil
 
-	// failed analyze some files
 	default:
 		prompt := fmt.Sprintf(
 			"failed to analyze %d out of %d files. Continue?",
 			len(failures),
-			len(success)+len(failures),
+			len(successes)+len(failures),
 		)
 
 		approved, err := Input(ctx, prompt, interactive)
 		if err != nil {
-			return success, failures, err
+			return result, err
 		}
 
 		if !approved {
-			return success, failures, fmt.Errorf(
+			return result, fmt.Errorf(
 				"aborted due to %d analysis failures",
 				len(failures),
 			)
 		}
-		return success, failures, nil
+		return result, nil
 	}
 }
+
+// Summary
+// Issue  						| Impact at 10k 			| Fix 
+// Sequential uploads 			| High major bottleneck 	| Parallelize like analysis
+// All responses in memory 		| Low — manageable 			| Merge post+upload per batch
+// No resume/retry 				| Medium 					| Track completed checksums 
+// No file size guard 			| Low — edge case 			| os.Stat before hashing

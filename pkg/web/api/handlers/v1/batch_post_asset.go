@@ -27,11 +27,11 @@ type AssetsBatchResponse struct {
 }
 
 type BatchAssetDetails struct {
-	ID         uint       `json:"id"`
-	Checksum   string     `json:"checksum"`
-	State      string     `json:"state"`
-	IngressUrl string     `json:"ingress_url,omitempty"`
-	ExpiresAt  *time.Time `json:"expires_at,omitempty"`
+	ID         uint            `json:"id"`
+	Checksum   string          `json:"checksum"`
+	State      string          `json:"state"`
+	IngressUrl registry.Secret `json:"ingress_url,omitempty"`
+	ExpiresAt  *time.Time      `json:"expires_at,omitempty"`
 }
 
 func CreateAssetsBatchHandler(svc *data.Service, ctx *gin.Context) {
@@ -48,7 +48,7 @@ func CreateAssetsBatchHandler(svc *data.Service, ctx *gin.Context) {
 	}
 
 	// Convert request to records
-	assets, err := assetsBatchToRecords(&request)
+	assets, err := assetsBatchRequest2Records(&request)
 	if err != nil {
 		dto.HandleErrorResponse(
 			ctx,
@@ -69,7 +69,7 @@ func CreateAssetsBatchHandler(svc *data.Service, ctx *gin.Context) {
 	response.Created(ctx)
 }
 
-func assetsBatchToRecords(payload *CreateAssetsBatchRequest) ([]*registry.Asset, error) {
+func assetsBatchRequest2Records(payload *CreateAssetsBatchRequest) ([]*registry.Asset, error) {
 	records := make([]*registry.Asset, len(payload.Assets))
 
 	for i, asset := range payload.Assets {
@@ -90,21 +90,6 @@ func assetsBatchToRecords(payload *CreateAssetsBatchRequest) ([]*registry.Asset,
 	return records, nil
 }
 
-func newBatchAssetDetails(asset *registry.Asset, uploadURL *registry.PresignedUrl) *BatchAssetDetails {
-	response := &BatchAssetDetails{
-		ID:       asset.ID,
-		Checksum: asset.Checksum,
-		State:    string(asset.State),
-	}
-
-	if uploadURL != nil {
-		response.IngressUrl = uploadURL.URL.Value()
-		response.ExpiresAt = &uploadURL.ExpiresAt
-	}
-
-	return response
-}
-
 func newAssetsBatchResponse(
 	ctx *gin.Context,
 	assets []*registry.Asset,
@@ -121,7 +106,13 @@ func newAssetsBatchResponse(
 	batchAssets := make([]*BatchAssetDetails, len(assets))
 	for i, a := range assets {
 		uploadURL := urlMap[a.Checksum] // may be nil if no URL exists
-		batchAssets[i] = newBatchAssetDetails(a, uploadURL)
+		batchAssets[i] = &BatchAssetDetails{
+			ID:         a.ID,
+			Checksum:   a.Checksum,
+			State:      string(a.State),
+			IngressUrl: uploadURL.URL,
+			ExpiresAt:  &uploadURL.ExpiresAt,
+		}
 	}
 
 	response := AssetsBatchResponse{
