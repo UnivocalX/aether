@@ -18,6 +18,9 @@ const (
 	AssetsBatchApiPath = "/batch/assets"
 )
 
+// matches should get a list of file path so move glob outside
+// load should return success, failure and error for easier retry outside of it, if needed
+// stream the analysis results as a input to a universe pipeline that has 2 stages, 1. Post 2. Upload
 func (c *Client) LoadAssets(ctx context.Context, pattern string) error {
 	slog.Info("starting to load files as assets", "pattern", pattern)
 
@@ -31,15 +34,19 @@ func (c *Client) LoadAssets(ctx context.Context, pattern string) error {
 	}
 	slog.Info("found candidates", "total", len(matches))
 
-	// analyze matches
-	stream := analyzePipeline(ctx, matches, c.interactive)
-	result, err := handleAnalysisResult(ctx, stream, c.interactive)
+	// analyze matches (validate file, get checksum, resolve full path)
+	stream := analyzePipeline(ctx, matches, c.durable)
+
+	// fail if not durable
+	// if durable, continue
+	// return success and failure
+
+	success, _, err := handleAnalysisResult(ctx, stream, c.durable)
 	if err != nil {
 		return err
 	}
 
 	// post assets
-	assets := envelopes2Payloads(result.successes)
 	responses, err := c.PostAssets(ctx, assets...)
 	if err != nil {
 		return err
@@ -55,7 +62,7 @@ func (c *Client) LoadAssets(ctx context.Context, pattern string) error {
 }
 
 // PostAssets splits assets into batches and posts each one.
-func (c *Client) PostAssets(ctx context.Context, assets ...v1.AssetPayload) ([]*v1.AssetsBatchResponse, error) {
+func (c *Client) postAssets(ctx context.Context, analysis ...universe.Envelope[fileAnalysis]) ([]*v1.AssetsBatchResponse, error) {
 	slog.Info("posting assets", "total", len(assets))
 
 	responses := make([]*v1.AssetsBatchResponse, 0, len(assets)/BatchSize+1)
@@ -71,22 +78,6 @@ func (c *Client) PostAssets(ctx context.Context, assets ...v1.AssetPayload) ([]*
 	}
 
 	return responses, nil
-}
-
-// UploadAssets uploads each file to its corresponding ingress URL, matched by checksum.
-func (c *Client) UploadAssets(ctx context.Context, result AnalysisResults, responses ...*v1.AssetsBatchResponse) error {
-	for _, response := range responses {
-		for _, asset := range response.Assets {
-			env, ok := result.successes[asset.Checksum]
-			if !ok {
-				return fmt.Errorf("no local file found for checksum %s", asset.Checksum)
-			}
-			if _, err := c.upload2Storage(ctx, asset.IngressUrl, env.Value.Path); err != nil {
-				return fmt.Errorf("failed to upload asset %s: %w", env.Value.Path, err)
-			}
-		}
-	}
-	return nil
 }
 
 func (c *Client) PostAssetsBatch(ctx context.Context, req v1.CreateAssetsBatchRequest) (*v1.AssetsBatchResponse, error) {
@@ -113,14 +104,25 @@ func (c *Client) PostAssetsBatch(ctx context.Context, req v1.CreateAssetsBatchRe
 	return &response, nil
 }
 
-// envelopes2Payloads extracts AssetPayloads from the successes map.
-func envelopes2Payloads(envelopes map[string]universe.Envelope[fileAnalysis]) []v1.AssetPayload {
-	assets := make([]v1.AssetPayload, 0, len(envelopes))
-	for _, env := range envelopes {
-		assets = append(assets, v1.AssetPayload{
-			Checksum: env.Value.Checksum,
-			Display:  filepath.Base(env.Value.Path),
-		})
+// UploadAssets uploads each file to its corresponding ingress URL, matched by checksum.
+func (c *Client) UploadAssets(ctx context.Context, result AnalysisResults, responses ...*v1.AssetsBatchResponse) error {
+	for _, response := range responses {
+		for _, asset := range response.Assets {
+			env, ok := result.successes[asset.Checksum]
+			if !ok {
+				return fmt.Errorf("no local file found for checksum %s", asset.Checksum)
+			}
+			if _, err := c.upload2Storage(ctx, env.Value.Path, asset.IngressUrl); err != nil {
+				return fmt.Errorf("failed to upload asset %s: %w", env.Value.Path, err)
+			}
+		}
 	}
-	return assets
+	return nil
 }
+
+// Summary
+// Issue  						| Impact at 10k 			| Fix
+// Sequential uploads 			| High major bottleneck 	| Parallelize like analysis
+// All responses in memory 		| Low — manageable 			| Merge post+upload per batch
+// No resume/retry 				| Medium 					| Track completed checksums
+// No file size guard 			| Low — edge case 			| os.Stat before hashing

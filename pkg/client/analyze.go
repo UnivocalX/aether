@@ -16,11 +16,6 @@ import (
 	"github.com/schollz/progressbar/v3"
 )
 
-type AnalysisResults struct {
-	failures  map[string]universe.Envelope[fileAnalysis]
-	successes map[string]universe.Envelope[fileAnalysis]
-}
-
 // fileAnalysis represents a file and its SHA256 checksum.
 type fileAnalysis struct {
 	Path     string `yaml:"path"`
@@ -107,63 +102,59 @@ func analyzePipeline(ctx context.Context, paths []string, progress bool) univers
 	return universe.Map(source, analyzer, 8).Tap(barHandler, 1).Run(ctx)
 }
 
+type AssetsAnalysis struct {
+	success <-chan universe.Envelope[fileAnalysis]
+	failure universe.Envelope[fileAnalysis]
+}
+
+// handleAnalysisResult partitions a stream of file analyses into successes and failures.
+// If both exist and interactive is true, prompts the user whether to continue.
+// Returns slices of successful and failed analyses, plus an error if partitioning failed
+// or the user aborted.
 func handleAnalysisResult(
 	ctx context.Context,
 	stream universe.Stream[fileAnalysis],
 	interactive bool,
-) (AnalysisResults, error) {
-	successList, failureList, err := universe.Partition(ctx, stream.Data)
-
-	successes := make(map[string]universe.Envelope[fileAnalysis], len(successList))
-	for _, env := range successList {
-		successes[env.Value.Checksum] = env
-	}
-
-	failures := make(map[string]universe.Envelope[fileAnalysis], len(failureList))
-	for _, env := range failureList {
-		failures[env.Value.Path] = env
-	}
-
-	result := AnalysisResults{
-		successes: successes,
-		failures:  failures,
-	}
+) (
+	[]universe.Envelope[fileAnalysis],
+	[]universe.Envelope[fileAnalysis],
+	error,
+) {
+	success, failure, err := universe.Partition(ctx, stream.Data)
 
 	switch {
+	// Return immediately if partitioning the stream failed
 	case err != nil:
-		return result, err
+		return nil, nil, err
 
-	case len(successes) == 0:
-		return result, fmt.Errorf("no files were successfully analyzed")
+	// If no file was analyzed successfully, return failures and an error
+	case len(success) == 0:
+		return success, failure, fmt.Errorf("no files were successfully analyzed")
 
-	case len(failures) == 0:
-		return result, nil
+	// If all files were analyzed successfully, return the success list
+	case len(failure) == 0:
+		return success, failure, nil
 
+	// If there are both successes and failures, ask the user whether to continue
 	default:
 		prompt := fmt.Sprintf(
 			"failed to analyze %d out of %d files. Continue?",
-			len(failures),
-			len(successes)+len(failures),
+			len(failure),
+			len(success)+len(failure),
 		)
 
 		approved, err := Input(ctx, prompt, interactive)
 		if err != nil {
-			return result, err
+			return success, failure, err
 		}
 
 		if !approved {
-			return result, fmt.Errorf(
+			return success, failure, fmt.Errorf(
 				"aborted due to %d analysis failures",
-				len(failures),
+				len(failure),
 			)
 		}
-		return result, nil
+
+		return success, failure, nil
 	}
 }
-
-// Summary
-// Issue  						| Impact at 10k 			| Fix 
-// Sequential uploads 			| High major bottleneck 	| Parallelize like analysis
-// All responses in memory 		| Low — manageable 			| Merge post+upload per batch
-// No resume/retry 				| Medium 					| Track completed checksums 
-// No file size guard 			| Low — edge case 			| os.Stat before hashing

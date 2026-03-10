@@ -10,23 +10,23 @@ import (
 )
 
 const (
-	DefaultScheme  = "http"
-	DefaultHost    = "localhost:8080"
-	DefaultPath    = "/health"
-	MinTimeout     = 1 * time.Second
-	MaxTimeout     = 24 * time.Hour
+	DefaultScheme = "http"
+	DefaultHost   = "localhost:8080"
+	DefaultPath   = "/health"
+	MinTimeout    = 1 * time.Second
+	MaxTimeout    = 24 * time.Hour
 )
 
 type Client struct {
-	interactive bool
-	url  *url.URL
-	http *http.Client
+	durable bool
+	url     *url.URL
+	http    *http.Client
 }
 
 // New creates a new client with options applied and validated
 func New(opts ...Option) (*Client, error) {
 	c := &Client{
-		interactive: false,
+		durable: false,
 		url: &url.URL{
 			Scheme: DefaultScheme,
 			Host:   DefaultHost,
@@ -97,11 +97,10 @@ func WithScheme(s string) Option {
 	}
 }
 
-// WithMode sets interactive mode
-func WithMode(interactive bool) Option {
+// WithDurable sets interactive mode
+func WithDurable(durable bool) Option {
 	return func(c *Client) error {
-		c.interactive = interactive
+		c.durable = durable
 		return nil
 	}
 }
-

@@ -21,8 +21,7 @@ func Consume[T any](ctx context.Context, data <-chan Envelope[T], fn Consumer[T]
 }
 
 // Reduce folds all envelopes in the stream into a single accumulated result
-// using the reducer function. The reduction stops immediately when an
-// envelope carries an error. If the context is canceled, the partially
+// using the reducer function. If the context is canceled, the partially
 // reduced value and ctx.Err() are returned.
 func Reduce[T, R any](ctx context.Context, data <-chan Envelope[T], fn Reducer[T, R], init R) (R, error) {
 	reduced := init

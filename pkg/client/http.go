@@ -71,7 +71,7 @@ func (c *Client) delete(ctx context.Context, path string, body io.Reader) (*http
 
 // upload2Storage uploads a file to a presigned URL.
 // The caller is responsible for closing the response body.
-func (c *Client) upload2Storage(ctx context.Context, presignedUrl registry.Secret, path string) (*http.Response, error) {
+func (c *Client) upload2Storage(ctx context.Context, path string, presignedUrl registry.Secret, ) (*http.Response, error) {
 	u, err := url.Parse(presignedUrl.Value())
 	if err != nil {
 		return nil, err

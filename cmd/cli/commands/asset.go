@@ -46,7 +46,7 @@ func runLoadAssets(cmd *cobra.Command, args []string) error {
 
 	// create aether client
 	aether, err := client.New(
-		client.WithMode(!ci),
+		client.WithDurable(!ci),
 		client.WithHost(host),
 	)
 
